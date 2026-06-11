@@ -323,8 +323,28 @@ function makeNoteEditor(item, large) {
 function autoSizeExpandedNoteEditor(editor, body) {
   let frame = null;
 
+  const keepCaretVisible = () => {
+    if (document.activeElement !== editor) return;
+    const selection = window.getSelection();
+    if (!selection?.rangeCount) return;
+    const range = selection.getRangeAt(0);
+    if (!editor.contains(range.startContainer)) return;
+
+    const line = getCurrentNoteLine(editor);
+    const targetRect = line?.getBoundingClientRect() || range.getBoundingClientRect();
+    const editorRect = editor.getBoundingClientRect();
+    const inset = 8;
+
+    if (targetRect.bottom > editorRect.bottom - inset) {
+      editor.scrollTop += targetRect.bottom - editorRect.bottom + inset;
+    } else if (targetRect.top < editorRect.top + inset) {
+      editor.scrollTop -= editorRect.top - targetRect.top + inset;
+    }
+  };
+
   const resize = () => {
     frame = null;
+    const previousScrollTop = editor.scrollTop;
     editor.style.height = 'auto';
     editor.style.overflowY = 'hidden';
 
@@ -346,6 +366,8 @@ function autoSizeExpandedNoteEditor(editor, body) {
 
     editor.style.height = `${nextHeight}px`;
     editor.style.overflowY = contentHeight > availableHeight ? 'auto' : 'hidden';
+    editor.scrollTop = Math.min(previousScrollTop, Math.max(0, editor.scrollHeight - editor.clientHeight));
+    keepCaretVisible();
   };
 
   const scheduleResize = () => {
