@@ -40,7 +40,7 @@ export function createStarterWorkspace() {
           subtasks: [],
           notes: [{ text: "Capture the thing you do not want to lose.", level: 0 }],
           section: "notes",
-          initiative: "work",
+          initiatives: ["work"],
           meetingRef: null,
           createdAt: localDateString()
         }
@@ -54,7 +54,7 @@ export function createStarterWorkspace() {
           subtasks: [],
           notes: [{ text: "Add details here.", level: 0 }],
           section: "to-do",
-          initiative: "personal",
+          initiatives: ["personal"],
           meetingRef: null,
           createdAt: localDateString()
         }
@@ -68,7 +68,7 @@ export function createStarterWorkspace() {
           subtasks: [],
           notes: [{ text: "Use this column for work that is active but not done.", level: 0 }],
           section: "in-progress",
-          initiative: "work",
+          initiatives: ["work"],
           meetingRef: null,
           createdAt: localDateString()
         }
@@ -88,7 +88,7 @@ export function createCard(title, sectionIdValue, options = {}) {
     subtasks: [],
     notes: [],
     section: sectionIdValue,
-    initiative: options.initiative ?? undefined,
+    initiatives: options.initiatives ? [...options.initiatives] : (options.initiative ? [options.initiative] : []),
     meetingRef: options.meetingRef ?? undefined,
     createdAt: options.createdAt ?? localDateString()
   };
@@ -230,8 +230,26 @@ export function setCardNotes(card, notes) {
   return true;
 }
 
-export function setCardInitiative(card, initiative) {
-  card.initiative = initiative || null;
+export function ensureCardInitiatives(card) {
+  if (!Array.isArray(card.initiatives)) {
+    card.initiatives = card.initiative ? [card.initiative] : [];
+  }
+  delete card.initiative;
+  return card.initiatives;
+}
+
+export function setCardInitiatives(card, initiatives) {
+  card.initiatives = [...new Set((initiatives || []).filter(Boolean))];
+  delete card.initiative;
+  return true;
+}
+
+export function toggleCardInitiative(card, initiative) {
+  if (!initiative) return false;
+  const initiatives = ensureCardInitiatives(card);
+  const index = initiatives.indexOf(initiative);
+  if (index === -1) initiatives.push(initiative);
+  else initiatives.splice(index, 1);
   return true;
 }
 
@@ -294,16 +312,22 @@ export function getInitiativeColor(initiatives, name) {
 export function getInitiativeUsageCount(workspace, name) {
   let count = 0;
   for (const section of workspace.sections) {
-    (workspace.tasks[section.id] || []).forEach(card => { if (card.initiative === name) count++; });
+    (workspace.tasks[section.id] || []).forEach(card => {
+      if (ensureCardInitiatives(card).includes(name)) count++;
+    });
   }
   return count;
 }
 
+export function normalizeInitiativeName(name) {
+  return name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+}
+
 export function addInitiative(workspace, name) {
-  const trimmedName = name.trim();
-  if (!trimmedName || workspace.initiatives.includes(trimmedName)) return null;
-  workspace.initiatives.push(trimmedName);
-  return trimmedName;
+  const normalizedName = normalizeInitiativeName(name);
+  if (!normalizedName || workspace.initiatives.includes(normalizedName)) return null;
+  workspace.initiatives.push(normalizedName);
+  return normalizedName;
 }
 
 export function getLinkedTasks(workspace, slug) {
@@ -333,13 +357,20 @@ export function removeMeetingRefs(workspace, slug) {
 }
 
 export function renameInitiative(workspace, oldName, newName) {
+  const normalizedName = normalizeInitiativeName(newName);
+  if (!normalizedName || (normalizedName !== oldName && workspace.initiatives.includes(normalizedName))) return null;
   const index = workspace.initiatives.indexOf(oldName);
-  if (index !== -1) workspace.initiatives[index] = newName;
+  if (index === -1) return null;
+  workspace.initiatives[index] = normalizedName;
   for (const section of workspace.sections) {
     (workspace.tasks[section.id] || []).forEach(card => {
-      if (card.initiative === oldName) card.initiative = newName;
+      const initiatives = ensureCardInitiatives(card);
+      const cardIndex = initiatives.indexOf(oldName);
+      if (cardIndex !== -1) initiatives[cardIndex] = normalizedName;
+      card.initiatives = [...new Set(initiatives)];
     });
   }
+  return normalizedName;
 }
 
 export function deleteInitiative(workspace, name) {
@@ -347,7 +378,7 @@ export function deleteInitiative(workspace, name) {
   if (index !== -1) workspace.initiatives.splice(index, 1);
   for (const section of workspace.sections) {
     (workspace.tasks[section.id] || []).forEach(card => {
-      if (card.initiative === name) card.initiative = null;
+      card.initiatives = ensureCardInitiatives(card).filter(initiative => initiative !== name);
     });
   }
 }

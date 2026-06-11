@@ -13,6 +13,7 @@ import {
   deleteSection,
   deleteInitiative,
   ensureSubtasks,
+  ensureCardInitiatives,
   getLinkedTasks,
   getInitiativeColor,
   getInitiativeUsageCount,
@@ -21,16 +22,18 @@ import {
   moveCheckedTaskToDone,
   moveCard,
   moveSection,
+  normalizeInitiativeName,
   removeCard,
   removeMeetingRefs,
   removeSubtask,
   renameSection,
   setCardDueDate,
-  setCardInitiative,
+  setCardInitiatives,
   setCardNotes,
   setCardTitle,
   setWorkspaceCardTitle,
   toggleCardChecked,
+  toggleCardInitiative,
   toggleSubtaskChecked,
   updateMeetingRefs,
   updateSubtask,
@@ -38,6 +41,7 @@ import {
 } from "../src/core/workspace.js";
 
 assert.equal(defaultFileName, "my-notes.md");
+assert.equal(normalizeInitiativeName("  Client Work / Q3  "), "client-work-q3");
 
 const starter = createStarterMarkdown();
 assert.match(starter, /^# Notes\n/);
@@ -122,7 +126,7 @@ const linkedTask = createCardForSection("Follow up", "to-do", {
   initiative: "client",
   meetingRef: "roadmap-sync"
 });
-assert.equal(linkedTask.initiative, "client");
+assert.deepEqual(linkedTask.initiatives, ["client"]);
 assert.equal(linkedTask.meetingRef, "roadmap-sync");
 assert.equal(setCardTitle(linkedTask, "  Follow up again  "), true);
 assert.equal(linkedTask.title, "Follow up again");
@@ -130,8 +134,15 @@ assert.equal(setCardTitle(linkedTask, "   "), false);
 assert.equal(linkedTask.title, "Follow up again");
 assert.equal(setCardDueDate(linkedTask, "2026-06-15"), true);
 assert.equal(linkedTask.note, "2026-06-15");
-assert.equal(setCardInitiative(linkedTask, ""), true);
-assert.equal(linkedTask.initiative, null);
+assert.equal(setCardInitiatives(linkedTask, ["client", "ops", "client"]), true);
+assert.deepEqual(linkedTask.initiatives, ["client", "ops"]);
+assert.equal(toggleCardInitiative(linkedTask, "client"), true);
+assert.deepEqual(linkedTask.initiatives, ["ops"]);
+assert.equal(toggleCardInitiative(linkedTask, "product"), true);
+assert.deepEqual(linkedTask.initiatives, ["ops", "product"]);
+const legacyInitiativeCard = { initiative: "legacy" };
+assert.deepEqual(ensureCardInitiatives(legacyInitiativeCard), ["legacy"]);
+assert.equal("initiative" in legacyInitiativeCard, false);
 assert.equal(setCardNotes(linkedTask, [{ text: "Decision captured", level: 0 }]), true);
 assert.deepEqual(linkedTask.notes, [{ text: "Decision captured", level: 0 }]);
 assert.equal(toggleCardChecked(linkedTask), true);
@@ -156,10 +167,11 @@ assert.equal(getInitiativeColor(workspace.initiatives, "work"), initiativeColorP
 assert.equal(getInitiativeColor(workspace.initiatives, "personal"), initiativeColorPalette[1]);
 assert.equal(getInitiativeColor(workspace.initiatives, "missing"), initiativeColorPalette[2]);
 assert.equal(getInitiativeUsageCount(workspace, "work"), 2);
-assert.equal(addInitiative(workspace, "  ops  "), "ops");
+assert.equal(addInitiative(workspace, "  Ops Planning  "), "ops-planning");
+assert.equal(addInitiative(workspace, "ops"), "ops");
 assert.equal(addInitiative(workspace, "ops"), null);
 assert.equal(addInitiative(workspace, "   "), null);
-assert.deepEqual(workspace.initiatives, ["work", "personal", "ops"]);
+assert.deepEqual(workspace.initiatives, ["work", "personal", "ops-planning", "ops"]);
 
 const meetingNote = {
   id: "meeting-note",
@@ -168,7 +180,7 @@ const meetingNote = {
   subtasks: [],
   notes: [],
   section: "notes",
-  initiative: "client"
+  initiatives: ["client", "work"]
 };
 workspace.tasks.notes.push(meetingNote);
 workspace.tasks["to-do"][0].meetingRef = "roadmap-sync";
@@ -191,13 +203,13 @@ assert.equal(deleteCard(workspace, removableTask), removableTask);
 assert.equal(workspace.tasks["to-do"].some(card => card.id === "remove-me"), false);
 
 renameInitiative(workspace, "work", "client");
-assert.deepEqual(workspace.initiatives, ["client", "personal", "ops"]);
-assert.equal(workspace.tasks.notes[0].initiative, "client");
-assert.equal(workspace.tasks["in-progress"][0].initiative, "client");
+assert.deepEqual(workspace.initiatives, ["client", "personal", "ops-planning", "ops"]);
+assert.deepEqual(workspace.tasks.notes[0].initiatives, ["client"]);
+assert.deepEqual(workspace.tasks["in-progress"][0].initiatives, ["client"]);
 
 deleteInitiative(workspace, "personal");
-assert.deepEqual(workspace.initiatives, ["client", "ops"]);
-assert.equal(workspace.tasks["to-do"][0].initiative, null);
+assert.deepEqual(workspace.initiatives, ["client", "ops-planning", "ops"]);
+assert.deepEqual(workspace.tasks["to-do"][0].initiatives, []);
 
 const task = workspace.tasks["to-do"][0];
 task.checked = true;

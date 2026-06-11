@@ -349,7 +349,7 @@ function applyCardFilterDataset(el, card) {
   const meetingTitle = card.meetingRef ? (findMeetingBySlug(card.meetingRef)?.title || card.meetingRef) : '';
   const filterData = markdownCore.getCardFilterData(card, { meetingTitle });
   el.dataset.searchText = filterData.searchText;
-  el.dataset.initiative = filterData.initiative;
+  el.dataset.initiatives = JSON.stringify(filterData.initiatives);
 }
 
 function getLinkedTasks(slug) {
@@ -382,9 +382,11 @@ function getInitiativeUsageCount(name) {
 }
 
 function renameInitiative(oldName, newName) {
-  markdownCore.renameInitiative(getWorkspace(), oldName, newName);
-  if (globalInitFilter === oldName) globalInitFilter = newName;
+  const normalizedName = markdownCore.renameInitiative(getWorkspace(), oldName, newName);
+  if (!normalizedName) return null;
+  if (globalInitFilter === oldName) globalInitFilter = normalizedName;
   markChanged();
+  return normalizedName;
 }
 
 function deleteInitiative(name) {
@@ -426,11 +428,23 @@ function openSetupModal() {
       name.className = 'init-manage-name';
       name.textContent = init;
       name.addEventListener('click', () => {
+        const editWrap = document.createElement('div');
+        editWrap.className = 'init-manage-edit-wrap';
         const input = document.createElement('input');
         input.type = 'text';
         input.value = init;
         input.className = 'init-manage-edit';
-        name.replaceWith(input);
+        const preview = document.createElement('div');
+        preview.className = 'initiative-slug-preview';
+        const updatePreview = () => {
+          const normalized = markdownCore.normalizeInitiativeName(input.value);
+          preview.textContent = normalized && normalized !== input.value.trim()
+            ? `Will be saved as ${normalized}`
+            : '';
+        };
+        input.addEventListener('input', updatePreview);
+        editWrap.append(input, preview);
+        name.replaceWith(editWrap);
         input.focus();
         input.select();
         let saved = false;
@@ -475,6 +489,15 @@ function openSetupModal() {
     addInput.type = 'text';
     addInput.className = 'init-manage-input';
     addInput.placeholder = '+ Add initiative...';
+    const addPreview = document.createElement('div');
+    addPreview.className = 'initiative-slug-preview';
+    const updatePreview = () => {
+      const normalized = markdownCore.normalizeInitiativeName(addInput.value);
+      addPreview.textContent = normalized && normalized !== addInput.value.trim()
+        ? `Will be saved as ${normalized}`
+        : '';
+    };
+    addInput.addEventListener('input', updatePreview);
     addInput.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
         e.preventDefault();
@@ -491,6 +514,7 @@ function openSetupModal() {
       }
     });
     section.appendChild(addInput);
+    section.appendChild(addPreview);
 
     modalBody.appendChild(section);
   };
@@ -499,18 +523,65 @@ function openSetupModal() {
   modalOverlay.classList.add('visible');
 }
 
-function buildInitiativeDropdown(anchor, item, onSelect) {
+function cardInitiatives(item) {
+  return markdownCore.ensureCardInitiatives(item);
+}
+
+function createInitiativePill(name, options = {}) {
+  const pill = document.createElement(options.removable ? 'button' : 'span');
+  if (options.removable) pill.type = 'button';
+  const color = getInitiativeColor(name);
+  pill.className = 'initiative-pill';
+  pill.style.cssText = `background: ${color}22; color: ${color}; border-color: ${color}66;`;
+  pill.appendChild(document.createTextNode(name));
+  if (options.removable) {
+    const remove = document.createElement('span');
+    remove.className = 'initiative-pill-remove';
+    remove.textContent = '×';
+    pill.appendChild(remove);
+    pill.setAttribute('aria-label', `Remove ${name}`);
+    pill.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      options.onRemove?.();
+    });
+  }
+  return pill;
+}
+
+function renderInitiativePills(container, item) {
+  container.innerHTML = '';
+  cardInitiatives(item).forEach(name => container.appendChild(createInitiativePill(name)));
+  if (initiatives.length > 0) {
+    const add = document.createElement('button');
+    add.type = 'button';
+    add.className = 'initiative-pill initiative-pill-empty';
+    add.textContent = cardInitiatives(item).length > 0 ? '+' : '+ initiative';
+    add.style.display = 'inline-flex';
+    container.appendChild(add);
+  }
+}
+
+function updateInitiativePresentation(container, item) {
+  renderInitiativePills(container, item);
+  const card = container.closest('.task-card, .list-item');
+  if (!card) return;
+  applyCardFilterDataset(card, item);
+  const attached = cardInitiatives(item);
+  if (attached.length === 1) card.style.borderLeft = `3px solid ${getInitiativeColor(attached[0])}`;
+  else if (attached.length > 1) card.style.borderLeft = '3px solid var(--border)';
+  else card.style.borderLeft = '';
+  applyGlobalFilter();
+}
+
+function buildInitiativeDropdown(anchor, item, onChange) {
   document.querySelector('.initiative-dropdown')?.remove();
   if (initiatives.length === 0) return;
 
   const dropdown = document.createElement('div');
   dropdown.className = 'initiative-dropdown';
   let currentMatches = [];
-
-  const selectAndClose = (init) => {
-    onSelect(init);
-    dropdown.remove();
-  };
+  let highlightedIndex = 0;
 
   const searchInput = document.createElement('input');
   searchInput.type = 'text';
@@ -520,13 +591,24 @@ function buildInitiativeDropdown(anchor, item, onSelect) {
   searchInput.addEventListener('keydown', e => {
     if (e.key === 'Escape') {
       dropdown.remove();
+      e.preventDefault();
       e.stopPropagation();
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      highlightedIndex = Math.min(highlightedIndex + 1, currentMatches.length - 1);
+      renderOptions(searchInput.value);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      highlightedIndex = Math.max(highlightedIndex - 1, 0);
+      renderOptions(searchInput.value);
     } else if (e.key === 'Enter') {
       e.preventDefault();
       e.stopPropagation();
-      if (currentMatches.length > 0) {
-        selectAndClose(currentMatches[0]);
-      }
+      if (currentMatches[highlightedIndex]) toggle(currentMatches[highlightedIndex]);
+    } else if (e.key === 'Backspace' && !searchInput.value && cardInitiatives(item).length > 0) {
+      markdownCore.toggleCardInitiative(item, cardInitiatives(item).at(-1));
+      onChange();
+      renderOptions('');
     }
   });
   dropdown.appendChild(searchInput);
@@ -537,32 +619,42 @@ function buildInitiativeDropdown(anchor, item, onSelect) {
   const renderOptions = (query) => {
     optionsEl.innerHTML = '';
     const q = query.toLowerCase();
-    currentMatches = !q ? [null, ...initiatives] : initiatives.filter(init => init.toLowerCase().includes(q));
-    if (!q) {
-      const noneOpt = document.createElement('div');
-      noneOpt.className = 'initiative-option' + (!item.initiative ? ' active' : '');
-      noneOpt.textContent = 'None';
-      noneOpt.addEventListener('click', (e) => { e.stopPropagation(); selectAndClose(null); });
-      optionsEl.appendChild(noneOpt);
-    }
-    currentMatches.filter(init => init !== null).forEach((init, idx) => {
+    currentMatches = initiatives.filter(init => init.toLowerCase().includes(q));
+    if (highlightedIndex >= currentMatches.length) highlightedIndex = Math.max(0, currentMatches.length - 1);
+    currentMatches.forEach((init, idx) => {
       const color = getInitiativeColor(init);
-      const opt = document.createElement('div');
-      opt.className = 'initiative-option' + (item.initiative === init || (q && idx === 0) ? ' active' : '');
+      const opt = document.createElement('button');
+      opt.type = 'button';
+      const selected = cardInitiatives(item).includes(init);
+      opt.className = 'initiative-option' + (idx === highlightedIndex ? ' highlighted' : '') + (selected ? ' selected' : '');
       const dot = document.createElement('span');
       dot.className = 'initiative-option-dot';
       dot.style.background = color;
       const label = document.createElement('span');
       label.textContent = init;
+      const state = document.createElement('span');
+      state.className = 'initiative-option-state';
+      state.textContent = selected ? 'Selected' : 'Add';
       opt.appendChild(dot);
       opt.appendChild(label);
-      opt.addEventListener('click', (e) => { e.stopPropagation(); selectAndClose(init); });
+      opt.appendChild(state);
+      opt.addEventListener('mouseenter', () => { highlightedIndex = idx; });
+      opt.addEventListener('click', (e) => { e.stopPropagation(); toggle(init); });
       optionsEl.appendChild(opt);
     });
   };
 
+  const toggle = (init) => {
+    markdownCore.toggleCardInitiative(item, init);
+    onChange();
+    searchInput.value = '';
+    highlightedIndex = 0;
+    renderOptions('');
+    searchInput.focus();
+  };
+
   renderOptions('');
-  searchInput.addEventListener('input', () => renderOptions(searchInput.value));
+  searchInput.addEventListener('input', () => { highlightedIndex = 0; renderOptions(searchInput.value); });
 
   document.body.appendChild(dropdown);
   const rect = anchor.getBoundingClientRect();
@@ -577,26 +669,85 @@ function buildInitiativeDropdown(anchor, item, onSelect) {
 }
 
 function showInitiativeDropdown(anchor, item) {
-  buildInitiativeDropdown(anchor, item, (init) => {
-    markdownCore.setCardInitiative(item, init);
+  buildInitiativeDropdown(anchor, item, () => {
     markChanged();
-    renderTasks();
+    updateInitiativePresentation(anchor, item);
   });
 }
 
-function createInitiativePill(item) {
-  const pill = document.createElement('div');
-  if (item.initiative) {
-    const color = getInitiativeColor(item.initiative);
-    pill.className = 'initiative-pill';
-    pill.style.cssText = `background: ${color}22; color: ${color}; border-color: ${color}66;`;
-    pill.textContent = item.initiative;
-  } else {
-    pill.className = 'initiative-pill initiative-pill-empty';
-    pill.textContent = '+ tag';
-  }
-  pill.addEventListener('click', (e) => { e.stopPropagation(); showInitiativeDropdown(pill, item); });
-  return pill;
+function createInitiativePills(item) {
+  const container = document.createElement('div');
+  container.className = 'initiative-pills';
+  renderInitiativePills(container, item);
+  container.addEventListener('click', (e) => {
+    e.stopPropagation();
+    showInitiativeDropdown(container, item);
+  });
+  return container;
+}
+
+function createInitiativeEditor(item) {
+  const editor = document.createElement('div');
+  editor.className = 'initiative-token-editor';
+  const field = document.createElement('div');
+  field.className = 'initiative-token-field';
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'initiative-token-input';
+  input.placeholder = 'Add initiative...';
+  input.autocomplete = 'off';
+  const optionsEl = document.createElement('div');
+  optionsEl.className = 'initiative-token-options';
+  let highlightedIndex = 0;
+
+  const matches = () => initiatives.filter(init => init.toLowerCase().includes(input.value.trim().toLowerCase()));
+  const toggle = (name) => {
+    markdownCore.toggleCardInitiative(item, name);
+    input.value = '';
+    highlightedIndex = 0;
+    markChanged();
+    render();
+    input.focus();
+  };
+  const render = () => {
+    field.querySelectorAll('.initiative-pill').forEach(pill => pill.remove());
+    cardInitiatives(item).forEach(name => {
+      field.insertBefore(createInitiativePill(name, { removable: true, onRemove: () => toggle(name) }), input);
+    });
+    const currentMatches = matches();
+    if (highlightedIndex >= currentMatches.length) highlightedIndex = Math.max(0, currentMatches.length - 1);
+    optionsEl.innerHTML = '';
+    currentMatches.forEach((name, index) => {
+      const option = document.createElement('button');
+      option.type = 'button';
+      option.className = 'initiative-option' + (index === highlightedIndex ? ' highlighted' : '') + (cardInitiatives(item).includes(name) ? ' selected' : '');
+      const dot = document.createElement('span');
+      dot.className = 'initiative-option-dot';
+      dot.style.background = getInitiativeColor(name);
+      const state = document.createElement('span');
+      state.className = 'initiative-option-state';
+      state.textContent = cardInitiatives(item).includes(name) ? 'Selected' : 'Add';
+      option.append(dot, document.createTextNode(name), state);
+      option.addEventListener('mouseenter', () => { highlightedIndex = index; });
+      option.addEventListener('click', () => toggle(name));
+      optionsEl.appendChild(option);
+    });
+  };
+
+  input.addEventListener('input', () => { highlightedIndex = 0; render(); });
+  input.addEventListener('keydown', (e) => {
+    const currentMatches = matches();
+    if (e.key === 'ArrowDown') { e.preventDefault(); highlightedIndex = Math.min(highlightedIndex + 1, currentMatches.length - 1); render(); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); highlightedIndex = Math.max(highlightedIndex - 1, 0); render(); }
+    else if (e.key === 'Enter' && currentMatches[highlightedIndex]) { e.preventDefault(); toggle(currentMatches[highlightedIndex]); }
+    else if (e.key === 'Backspace' && !input.value && cardInitiatives(item).length > 0) { e.preventDefault(); toggle(cardInitiatives(item).at(-1)); }
+    else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); input.value = ''; highlightedIndex = 0; render(); }
+  });
+  field.addEventListener('click', () => input.focus());
+  field.appendChild(input);
+  editor.append(field, optionsEl);
+  render();
+  return editor;
 }
 
 function openCardExpanded(item, focusTarget = null) {
@@ -685,6 +836,13 @@ function openCardExpanded(item, focusTarget = null) {
     dueDateInput.addEventListener('change', () => { markdownCore.setCardDueDate(item, dueDateInput.value); markChanged(); });
     dueDateRow.appendChild(dueDateInput);
     body.appendChild(dueDateRow);
+
+    const initiativesLabel = document.createElement('div');
+    initiativesLabel.className = 'card-expand-label';
+    initiativesLabel.style.marginTop = '20px';
+    initiativesLabel.textContent = 'Initiatives';
+    body.appendChild(initiativesLabel);
+    body.appendChild(createInitiativeEditor(item));
 
     const notesLabel = document.createElement('div');
     notesLabel.className = 'card-expand-label';
@@ -826,7 +984,7 @@ function openCardExpanded(item, focusTarget = null) {
           if (!title || sections.length === 0) return;
           const targetSection = (sections.find(section => section.id !== item.section) || sections[0]).id;
           const linkedCard = markdownCore.createCard(title, targetSection, {
-            initiative: item.initiative || null,
+            initiatives: cardInitiatives(item),
             meetingRef: slug
           });
           markdownCore.addCardToSection(getWorkspace(), targetSection, linkedCard, insertIdx);
@@ -848,35 +1006,6 @@ function openCardExpanded(item, focusTarget = null) {
   // ── Footer ──
   const footer = document.createElement('div');
   footer.className = 'card-expand-footer';
-
-  // Initiative pill (inline, no renderTasks)
-  const pillWrap = document.createElement('div');
-  const updateExpandedPill = () => {
-    pillWrap.innerHTML = '';
-    if (initiatives.length === 0) return;
-    const pill = document.createElement('div');
-    if (item.initiative) {
-      const color = getInitiativeColor(item.initiative);
-      pill.className = 'initiative-pill';
-      pill.style.cssText = `background: ${color}22; color: ${color}; border-color: ${color}66;`;
-      pill.textContent = item.initiative;
-    } else {
-      pill.className = 'initiative-pill initiative-pill-empty';
-      pill.textContent = '+ tag';
-      pill.style.display = 'inline-flex';
-    }
-    pill.addEventListener('click', (e) => {
-      e.stopPropagation();
-      buildInitiativeDropdown(pill, item, (init) => {
-        markdownCore.setCardInitiative(item, init);
-        markChanged();
-        updateExpandedPill();
-      });
-    });
-    pillWrap.appendChild(pill);
-  };
-  updateExpandedPill();
-  footer.appendChild(pillWrap);
 
   const sectionName = sections.find(s => s.id === item.section)?.name || '';
   if (sectionName) {
@@ -912,7 +1041,9 @@ function createCard(task) {
   card.draggable = true;
   card.dataset.id = task.id;
   applyCardFilterDataset(card, task);
-  if (task.initiative) card.style.borderLeft = `3px solid ${getInitiativeColor(task.initiative)}`;
+  const attachedInitiatives = cardInitiatives(task);
+  if (attachedInitiatives.length === 1) card.style.borderLeft = `3px solid ${getInitiativeColor(attachedInitiatives[0])}`;
+  else if (attachedInitiatives.length > 1) card.style.borderLeft = '3px solid var(--border)';
 
   let html = `
     <button class="card-expand-btn" data-action="expand" title="Expand"><svg width="11" height="11" viewBox="0 0 11 11" fill="none" style="pointer-events:none"><path d="M7 1h3v3M4 10H1V7M10 1L6.5 4.5M1 10L4.5 6.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button>
@@ -959,11 +1090,11 @@ function createCard(task) {
 
   card.innerHTML = html;
 
-  if (initiatives.length > 0 || task.meetingRef) {
+  if (initiatives.length > 0 || cardInitiatives(task).length > 0 || task.meetingRef) {
     const metaRow = document.createElement('div');
     metaRow.className = 'card-meta-row';
-    if (initiatives.length > 0) {
-      metaRow.appendChild(createInitiativePill(task));
+    if (initiatives.length > 0 || cardInitiatives(task).length > 0) {
+      metaRow.appendChild(createInitiativePills(task));
     } else {
       metaRow.appendChild(document.createElement('span'));
     }
@@ -1031,9 +1162,9 @@ function createNoteCard(item) {
   card.className = 'task-card note-card';
   card.draggable = true;
   card.dataset.id = item.id;
-  if (item.initiative) {
-    card.style.borderLeftColor = getInitiativeColor(item.initiative);
-  }
+  const attachedInitiatives = cardInitiatives(item);
+  if (attachedInitiatives.length === 1) card.style.borderLeftColor = getInitiativeColor(attachedInitiatives[0]);
+  else if (attachedInitiatives.length > 1) card.style.borderLeftColor = 'var(--border)';
   applyCardFilterDataset(card, item);
 
   // Header: delete + title
@@ -1121,10 +1252,10 @@ function createNoteCard(item) {
   notesArea.addEventListener('click', (e) => { e.stopPropagation(); openCardExpanded(item); });
   card.appendChild(notesArea);
 
-  if (initiatives.length > 0) {
+  if (initiatives.length > 0 || cardInitiatives(item).length > 0) {
     const pillRow = document.createElement('div');
     pillRow.style.cssText = 'display: flex; justify-content: flex-start; margin-top: 8px;';
-    pillRow.appendChild(createInitiativePill(item));
+    pillRow.appendChild(createInitiativePills(item));
     card.appendChild(pillRow);
   }
 
@@ -1920,7 +2051,9 @@ function createListItem(task, section) {
   item.draggable = true;
   item.dataset.taskId = task.id;
   applyCardFilterDataset(item, task);
-  if (task.initiative) item.style.borderLeft = `3px solid ${getInitiativeColor(task.initiative)}`;
+  const attachedInitiatives = cardInitiatives(task);
+  if (attachedInitiatives.length === 1) item.style.borderLeft = `3px solid ${getInitiativeColor(attachedInitiatives[0])}`;
+  else if (attachedInitiatives.length > 1) item.style.borderLeft = '3px solid var(--border)';
 
   item.addEventListener('dragstart', (e) => {
     item.classList.add('dragging');
@@ -2055,12 +2188,12 @@ function createListItem(task, section) {
     content.appendChild(subtasksContainer);
   }
 
-  if (initiatives.length > 0 || task.meetingRef) {
+  if (initiatives.length > 0 || cardInitiatives(task).length > 0 || task.meetingRef) {
     const metaRow = document.createElement('div');
     metaRow.className = 'card-meta-row';
     metaRow.style.marginTop = '6px';
-    if (initiatives.length > 0) {
-      metaRow.appendChild(createInitiativePill(task));
+    if (initiatives.length > 0 || cardInitiatives(task).length > 0) {
+      metaRow.appendChild(createInitiativePills(task));
     } else {
       metaRow.appendChild(document.createElement('span'));
     }
@@ -2111,9 +2244,9 @@ function createNoteListItem(item) {
   el.draggable = true;
   el.dataset.taskId = item.id;
   applyCardFilterDataset(el, item);
-  if (item.initiative) {
-    el.style.borderLeftColor = getInitiativeColor(item.initiative);
-  }
+  const attachedInitiatives = cardInitiatives(item);
+  if (attachedInitiatives.length === 1) el.style.borderLeftColor = getInitiativeColor(attachedInitiatives[0]);
+  else if (attachedInitiatives.length > 1) el.style.borderLeftColor = 'var(--border)';
 
   el.addEventListener('dragstart', (e) => {
     el.classList.add('dragging');
@@ -2182,10 +2315,10 @@ function createNoteListItem(item) {
   notesArea.addEventListener('click', (e) => { e.stopPropagation(); openCardExpanded(item); });
   content.appendChild(notesArea);
 
-  if (initiatives.length > 0) {
+  if (initiatives.length > 0 || cardInitiatives(item).length > 0) {
     const pillRow = document.createElement('div');
     pillRow.style.cssText = 'display: flex; justify-content: flex-start; margin-top: 6px;';
-    pillRow.appendChild(createInitiativePill(item));
+    pillRow.appendChild(createInitiativePills(item));
     content.appendChild(pillRow);
   }
 

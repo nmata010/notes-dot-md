@@ -3,7 +3,7 @@ import { formatNoteForClipboard } from "../src/core/export.js";
 
 const note = {
   title: "Roadmap sync",
-  initiative: "team",
+  initiatives: ["team", "product"],
   notes: [
     { text: "Keep the app static.", level: 0 },
     { text: "Extract core behavior.", level: 1 },
@@ -28,9 +28,9 @@ assert.equal(formatNoteForClipboard(note, linkedTasks), [
   "[ ] Record demo gif",
   "[x] Remove stale section",
   "",
-  "Initiative: team"
+  "Initiatives: team, product"
 ].join("\n"));
 
-assert.equal(formatNoteForClipboard({ title: "Empty", notes: [], initiative: null }), "Empty");
+assert.equal(formatNoteForClipboard({ title: "Empty", notes: [], initiatives: [] }), "Empty");
 
 console.log("Core export tests passed.");

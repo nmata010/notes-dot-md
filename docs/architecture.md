@@ -42,6 +42,8 @@ Current conventions:
 - `Created`, `Due`, and `Relates to` use bold nested metadata lines.
 - Other nested bullets become notes; nested checkbox bullets become subtasks.
 - The setup block after `---` stores initiatives.
+- Cards store zero or more initiatives as contiguous trailing hashtags, such as `#product #marketing`.
+- Existing setup initiative names containing spaces are preserved and used to parse legacy trailing tags.
 
 The parser accepts the older split note/task syntax and inline due dates. Saving normalizes those cards to the unified format without inventing missing creation dates.
 

@@ -24,8 +24,9 @@ export function formatNoteForClipboard(noteCard, linkedTasks = []) {
     lines.push("");
   }
 
-  if (noteCard.initiative) {
-    lines.push(`Initiative: ${noteCard.initiative}`);
+  const initiatives = noteCard.initiatives || (noteCard.initiative ? [noteCard.initiative] : []);
+  if (initiatives.length > 0) {
+    lines.push(`${initiatives.length === 1 ? "Initiative" : "Initiatives"}: ${initiatives.join(", ")}`);
   }
 
   return lines.join("\n").trim();

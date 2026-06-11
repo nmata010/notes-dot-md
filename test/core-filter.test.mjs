@@ -9,7 +9,7 @@ import {
 const task = {
   title: "Record demo gif",
   note: "2026-06-12",
-  initiative: "product",
+  initiatives: ["product", "marketing"],
   meetingRef: "roadmap-sync",
   notes: [{ text: "Show board view.", level: 0 }, "Copy filtered tasks."],
   subtasks: [{ text: "Open sample file.", checked: false }]
@@ -18,15 +18,17 @@ const task = {
 assert.equal(normalizeSearchText(" Product "), " product ");
 assert.equal(
   getCardSearchText(task, { meetingTitle: "Roadmap sync" }),
-  "record demo gif 2026-06-12 roadmap sync product open sample file. show board view. copy filtered tasks."
+  "record demo gif 2026-06-12 roadmap sync product marketing open sample file. show board view. copy filtered tasks."
 );
 
 const data = getCardFilterData(task, { meetingTitle: "Roadmap sync" });
-assert.equal(data.initiative, "product");
+assert.deepEqual(data.initiatives, ["product", "marketing"]);
 assert.equal(matchesFilter(data, { query: "roadmap", initiative: "product" }), true);
+assert.equal(matchesFilter(data, { query: "roadmap", initiative: "marketing" }), true);
 assert.equal(matchesFilter(data, { query: "missing", initiative: "product" }), false);
 assert.equal(matchesFilter(data, { query: "roadmap", initiative: "design" }), false);
-assert.equal(matchesFilter({ searchText: "untagged note", initiative: "" }, { initiative: "__none__" }), true);
+assert.equal(matchesFilter({ searchText: "untagged note", initiatives: [] }, { initiative: "__none__" }), true);
 assert.equal(matchesFilter(data, { initiative: "__none__" }), false);
+assert.equal(matchesFilter({ searchText: "card", initiatives: '["product","marketing"]' }, { initiative: "marketing" }), true);
 
 console.log("Core filter tests passed.");

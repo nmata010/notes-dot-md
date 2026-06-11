@@ -21,10 +21,26 @@ export function findMeetingBySlug(workspace, slug) {
   return null;
 }
 
-function extractInitiative(str) {
-  const match = str.match(/\s+#([\w-]+)$/);
-  if (match) return { initiative: match[1], str: str.slice(0, str.length - match[0].length) };
-  return { initiative: null, str };
+function extractInitiatives(str, knownInitiatives = []) {
+  const initiatives = [];
+  const knownByLength = [...knownInitiatives].sort((a, b) => b.length - a.length);
+  let remaining = str;
+
+  while (remaining) {
+    const known = knownByLength.find(name => remaining.endsWith(` #${name}`));
+    if (known) {
+      initiatives.unshift(known);
+      remaining = remaining.slice(0, -known.length - 2);
+      continue;
+    }
+
+    const match = remaining.match(/\s+#([\w-]+)$/);
+    if (!match) break;
+    initiatives.unshift(match[1]);
+    remaining = remaining.slice(0, remaining.length - match[0].length);
+  }
+
+  return { initiatives, str: remaining };
 }
 
 function createId() {
@@ -75,7 +91,7 @@ export function parseMarkdown(content) {
       const checked = line.match(/\[[xX]\]/) !== null;
       const rawText = line.replace(/^- \[[ xX]\]\s*/, '');
       const { meetingRef, str: afterRef } = extractMeetingRef(rawText);
-      const { str: text, initiative } = extractInitiative(afterRef);
+      const { str: text, initiatives } = extractInitiatives(afterRef, resultInitiatives);
       let title = text;
       let note = '';
 
@@ -87,7 +103,7 @@ export function parseMarkdown(content) {
 
       currentCard = {
         id: createId(), title, note, checked, subtasks: [], notes: [], section: currentSectionId,
-        initiative, meetingRef, createdAt: null
+        initiatives, meetingRef, createdAt: null
       };
     } else if (currentCard && line.match(/^\s+- /) && !line.match(/^\s+- \[[ xX]\]/)) {
       const match = line.match(/^(\s+)- (.*)/);
@@ -117,11 +133,11 @@ export function parseMarkdown(content) {
     } else if (currentSectionId && line.match(/^- (?!\[)/)) {
       saveCurrentCard();
 
-      const { str: noteLine, initiative } = extractInitiative(line.replace(/^- /, '').trim());
+      const { str: noteLine, initiatives } = extractInitiatives(line.replace(/^- /, '').trim(), resultInitiatives);
       const noteTitle = noteLine.replace(/^\*\*(.+)\*\*$/, '$1');
       currentCard = {
         id: createId(), title: noteTitle, note: '', checked: false, subtasks: [], notes: [],
-        section: currentSectionId, initiative, meetingRef: null, createdAt: null
+        section: currentSectionId, initiatives, meetingRef: null, createdAt: null
       };
     }
   }
@@ -135,8 +151,10 @@ function serializeCards(cards, workspace) {
   let md = '';
   cards.forEach(card => {
     const checkbox = card.checked ? '[x]' : '[ ]';
-    const tag = card.initiative ? ` #${card.initiative}` : '';
-    md += `- ${checkbox} **${card.title}**${tag}\n`;
+    const tags = (card.initiatives || (card.initiative ? [card.initiative] : []))
+      .map(initiative => ` #${initiative}`)
+      .join('');
+    md += `- ${checkbox} **${card.title}**${tags}\n`;
     if (card.createdAt) md += `\t- **Created:** ${card.createdAt}\n`;
     if (card.note) md += `\t- **Due:** ${card.note}\n`;
     if (card.meetingRef) {

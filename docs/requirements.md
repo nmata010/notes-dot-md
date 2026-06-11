@@ -9,7 +9,7 @@ It provides one place to capture work, then lets the user narrow that record to 
 - Open an existing local `.md` file.
 - Create a new starter `.md` file.
 - Capture meetings, tasks, and thoughts as cards in the same workspace.
-- Preserve useful context on each card, including initiative, creation date, due date, subtasks, and relationships.
+- Preserve useful context on each card, including initiatives, creation date, due date, subtasks, and relationships.
 - Support board and list views.
 - Filter the workspace by initiative and matching text.
 - Copy the filtered cards and their metadata as structured markdown.
@@ -33,10 +33,10 @@ It provides one place to capture work, then lets the user narrow that record to 
 ## Product Model
 
 - Sections provide context and workflow state; they do not define card type.
-- Every card has a checkbox and can have a creation date, due date, notes, subtasks, initiative, and optional relationship to another card.
+- Every card has a checkbox and can have a creation date, due date, notes, subtasks, zero or more initiatives, and an optional relationship to another card.
 - Checking a card moves it to `Done`; manually moving it afterward is allowed even if that creates a contradictory state.
 - New cards receive a creation date. Existing cards without one remain undated rather than receiving an invented date.
-- Initiatives create a low-maintenance structure for filtering and visual scanning without requiring folders or directories.
+- Initiatives create a low-maintenance structure for filtering and visual scanning without requiring folders or directories. A card may belong to multiple equal initiatives.
 - Filtered cards can be copied together as a portable bundle of context.
 
 ## Non-Goals

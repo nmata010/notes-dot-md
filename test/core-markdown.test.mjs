@@ -23,7 +23,7 @@ assert.equal(notes[0].title, "Monday planning");
 assert.equal(notes[0].checked, false);
 assert.equal(notes[0].createdAt, null);
 assert.deepEqual(notes[0].subtasks, []);
-assert.equal(notes[0].initiative, "product");
+assert.deepEqual(notes[0].initiatives, ["product"]);
 assert.deepEqual(notes[0].notes, [
   { text: "Capture demo beats.", level: 0 },
   { text: "Nested detail.", level: 1 }
@@ -33,7 +33,7 @@ const todo = workspace.tasks["to-do"][0];
 assert.equal(todo.title, "Record demo gif");
 assert.equal(todo.note, "2026-06-12");
 assert.equal(todo.checked, false);
-assert.equal(todo.initiative, "product");
+assert.deepEqual(todo.initiatives, ["product"]);
 assert.equal(todo.meetingRef, "roadmap-sync");
 assert.equal(todo.createdAt, null);
 assert.deepEqual(todo.notes, [
@@ -89,5 +89,26 @@ assert.equal(currentCard.note, "2026-06-20");
 assert.equal(currentCard.meetingRef, "roadmap-sync");
 assert.deepEqual(currentCard.notes, [{ text: "Decision captured.", level: 0 }]);
 assert.deepEqual(currentCard.subtasks, [{ text: "Share the decision.", checked: false }]);
+
+const multipleInitiatives = parseMarkdown([
+  "# Notes",
+  "",
+  "## To Do",
+  "- [ ] **Prepare launch plan** #product #marketing #q3-launch",
+  "- [ ] **Legacy planning** #Client Work #Q3 Planning",
+  "",
+  "---",
+  "## Setup",
+  "- product",
+  "- marketing",
+  "- q3-launch",
+  "- Client Work",
+  "- Q3 Planning",
+  ""
+].join("\n"));
+assert.deepEqual(multipleInitiatives.tasks["to-do"][0].initiatives, ["product", "marketing", "q3-launch"]);
+assert.deepEqual(multipleInitiatives.tasks["to-do"][1].initiatives, ["Client Work", "Q3 Planning"]);
+assert.match(serializeMarkdown(multipleInitiatives), /\*\*Prepare launch plan\*\* #product #marketing #q3-launch/);
+assert.match(serializeMarkdown(multipleInitiatives), /\*\*Legacy planning\*\* #Client Work #Q3 Planning/);
 
 console.log("Core markdown tests passed.");
