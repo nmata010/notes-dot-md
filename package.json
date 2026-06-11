@@ -1,0 +1,22 @@
+{
+  "name": "notes-dot-md",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A static, local-file markdown note and task dashboard.",
+  "license": "MIT",
+  "author": "Nick M",
+  "type": "module",
+  "keywords": [
+    "markdown",
+    "notes",
+    "tasks",
+    "local-first",
+    "github-pages"
+  ],
+  "scripts": {
+    "dev": "python3 -m http.server 4173",
+    "check": "node scripts/check.mjs",
+    "test": "node scripts/check.mjs",
+    "build": "node scripts/check.mjs"
+  }
+}
