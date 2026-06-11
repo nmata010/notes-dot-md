@@ -1909,12 +1909,14 @@ button:disabled {
 .note-editor-inline,
 .note-editor-large {
   width: 100%;
+  min-width: 0;
+  max-width: 100%;
   outline: none;
   color: var(--text-primary);
   font-family: inherit;
   box-sizing: border-box;
   word-break: break-word;
-  overflow-wrap: break-word;
+  overflow-wrap: anywhere;
 }
 
 .note-editor-inline {
@@ -1943,6 +1945,32 @@ button:disabled {
 .note-editor-large .note-line {
   padding-left: calc(var(--level, 0) * 14px);
   min-height: 1.4em;
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.card-expand-body .note-editor-inline {
+  flex: 0 0 auto;
+  max-height: min(320px, 40vh);
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.card-expand-body .note-editor-inline::-webkit-scrollbar {
+  width: 6px;
+}
+
+.card-expand-body .note-editor-inline::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.card-expand-body .note-editor-inline::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
 }
 
 .note-editor-inline .note-line::before,
