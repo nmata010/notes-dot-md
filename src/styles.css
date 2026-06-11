@@ -1051,48 +1051,6 @@ button:disabled {
   flex-shrink: 0;
 }
 
-.initiative-token-editor {
-  width: 100%;
-}
-
-.initiative-token-field {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 5px;
-  min-height: 43px;
-  padding: 7px;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 7px;
-  cursor: text;
-}
-
-.initiative-token-field:focus-within {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 8%, transparent);
-}
-
-.initiative-token-input {
-  flex: 1;
-  min-width: 130px;
-  padding: 3px 4px;
-  color: var(--text-primary);
-  background: transparent;
-  border: 0;
-  outline: 0;
-}
-
-.initiative-token-options {
-  max-height: 190px;
-  overflow-y: auto;
-  margin-top: 5px;
-  padding: 4px;
-  border: 1px solid var(--border);
-  border-radius: 7px;
-  background: var(--bg-card);
-}
-
 .new-task-input {
   width: 100%;
   background: var(--bg-card);
@@ -1759,8 +1717,46 @@ button:disabled {
   padding: 12px 24px;
   border-top: 1px solid var(--border-light);
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: space-between;
+  gap: 16px;
+  flex-shrink: 0;
+}
+
+.card-expand-initiatives {
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+
+.initiative-add-button {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  color: var(--text-muted);
+  background: transparent;
+  border: 1px dashed var(--border);
+  border-radius: 999px;
+  font-size: 15px;
+  line-height: 1;
+}
+
+.initiative-add-button:hover {
+  color: var(--text-primary);
+  background: var(--bg-secondary);
+  border-color: var(--text-muted);
+}
+
+.card-expand-footer-meta {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
   flex-shrink: 0;
 }
 

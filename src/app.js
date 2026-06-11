@@ -658,13 +658,23 @@ function buildInitiativeDropdown(anchor, item, onChange) {
 
   document.body.appendChild(dropdown);
   const rect = anchor.getBoundingClientRect();
-  dropdown.style.top = (rect.bottom + window.scrollY + 4) + 'px';
-  dropdown.style.left = rect.left + 'px';
+  const dropdownHeight = dropdown.offsetHeight;
+  const below = rect.bottom + 4;
+  const top = below + dropdownHeight <= window.innerHeight - 8
+    ? below
+    : Math.max(8, rect.top - dropdownHeight - 4);
+  dropdown.style.top = top + 'px';
+  dropdown.style.left = Math.min(rect.left, window.innerWidth - dropdown.offsetWidth - 8) + 'px';
 
   setTimeout(() => searchInput.focus(), 0);
   setTimeout(() => {
-    const close = (e) => { if (!dropdown.contains(e.target)) { dropdown.remove(); document.removeEventListener('click', close); } };
-    document.addEventListener('click', close);
+    const close = (e) => {
+      if (!dropdown.contains(e.target)) {
+        dropdown.remove();
+        document.removeEventListener('click', close, true);
+      }
+    };
+    document.addEventListener('click', close, true);
   }, 0);
 }
 
@@ -684,70 +694,6 @@ function createInitiativePills(item) {
     showInitiativeDropdown(container, item);
   });
   return container;
-}
-
-function createInitiativeEditor(item) {
-  const editor = document.createElement('div');
-  editor.className = 'initiative-token-editor';
-  const field = document.createElement('div');
-  field.className = 'initiative-token-field';
-  const input = document.createElement('input');
-  input.type = 'text';
-  input.className = 'initiative-token-input';
-  input.placeholder = 'Add initiative...';
-  input.autocomplete = 'off';
-  const optionsEl = document.createElement('div');
-  optionsEl.className = 'initiative-token-options';
-  let highlightedIndex = 0;
-
-  const matches = () => initiatives.filter(init => init.toLowerCase().includes(input.value.trim().toLowerCase()));
-  const toggle = (name) => {
-    markdownCore.toggleCardInitiative(item, name);
-    input.value = '';
-    highlightedIndex = 0;
-    markChanged();
-    render();
-    input.focus();
-  };
-  const render = () => {
-    field.querySelectorAll('.initiative-pill').forEach(pill => pill.remove());
-    cardInitiatives(item).forEach(name => {
-      field.insertBefore(createInitiativePill(name, { removable: true, onRemove: () => toggle(name) }), input);
-    });
-    const currentMatches = matches();
-    if (highlightedIndex >= currentMatches.length) highlightedIndex = Math.max(0, currentMatches.length - 1);
-    optionsEl.innerHTML = '';
-    currentMatches.forEach((name, index) => {
-      const option = document.createElement('button');
-      option.type = 'button';
-      option.className = 'initiative-option' + (index === highlightedIndex ? ' highlighted' : '') + (cardInitiatives(item).includes(name) ? ' selected' : '');
-      const dot = document.createElement('span');
-      dot.className = 'initiative-option-dot';
-      dot.style.background = getInitiativeColor(name);
-      const state = document.createElement('span');
-      state.className = 'initiative-option-state';
-      state.textContent = cardInitiatives(item).includes(name) ? 'Selected' : 'Add';
-      option.append(dot, document.createTextNode(name), state);
-      option.addEventListener('mouseenter', () => { highlightedIndex = index; });
-      option.addEventListener('click', () => toggle(name));
-      optionsEl.appendChild(option);
-    });
-  };
-
-  input.addEventListener('input', () => { highlightedIndex = 0; render(); });
-  input.addEventListener('keydown', (e) => {
-    const currentMatches = matches();
-    if (e.key === 'ArrowDown') { e.preventDefault(); highlightedIndex = Math.min(highlightedIndex + 1, currentMatches.length - 1); render(); }
-    else if (e.key === 'ArrowUp') { e.preventDefault(); highlightedIndex = Math.max(highlightedIndex - 1, 0); render(); }
-    else if (e.key === 'Enter' && currentMatches[highlightedIndex]) { e.preventDefault(); toggle(currentMatches[highlightedIndex]); }
-    else if (e.key === 'Backspace' && !input.value && cardInitiatives(item).length > 0) { e.preventDefault(); toggle(cardInitiatives(item).at(-1)); }
-    else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); input.value = ''; highlightedIndex = 0; render(); }
-  });
-  field.addEventListener('click', () => input.focus());
-  field.appendChild(input);
-  editor.append(field, optionsEl);
-  render();
-  return editor;
 }
 
 function openCardExpanded(item, focusTarget = null) {
@@ -771,6 +717,7 @@ function openCardExpanded(item, focusTarget = null) {
     if (v && v !== item.title) {
       if (markdownCore.setWorkspaceCardTitle(getWorkspace(), item, v)) markChanged();
     }
+    document.querySelector('.initiative-dropdown')?.remove();
     overlay.remove();
     document.removeEventListener('keydown', escHandler);
     renderTasks();
@@ -836,13 +783,6 @@ function openCardExpanded(item, focusTarget = null) {
     dueDateInput.addEventListener('change', () => { markdownCore.setCardDueDate(item, dueDateInput.value); markChanged(); });
     dueDateRow.appendChild(dueDateInput);
     body.appendChild(dueDateRow);
-
-    const initiativesLabel = document.createElement('div');
-    initiativesLabel.className = 'card-expand-label';
-    initiativesLabel.style.marginTop = '20px';
-    initiativesLabel.textContent = 'Initiatives';
-    body.appendChild(initiativesLabel);
-    body.appendChild(createInitiativeEditor(item));
 
     const notesLabel = document.createElement('div');
     notesLabel.className = 'card-expand-label';
@@ -1007,20 +947,49 @@ function openCardExpanded(item, focusTarget = null) {
   const footer = document.createElement('div');
   footer.className = 'card-expand-footer';
 
+  const footerInitiatives = document.createElement('div');
+  footerInitiatives.className = 'card-expand-initiatives';
+  const renderExpandedInitiatives = () => {
+    footerInitiatives.innerHTML = '';
+    cardInitiatives(item).forEach(name => footerInitiatives.appendChild(createInitiativePill(name)));
+    if (initiatives.length > 0) {
+      const addButton = document.createElement('button');
+      addButton.type = 'button';
+      addButton.className = 'initiative-add-button';
+      addButton.textContent = '+';
+      addButton.title = 'Add initiative';
+      addButton.setAttribute('aria-label', 'Add initiative');
+      addButton.addEventListener('click', (e) => {
+        e.stopPropagation();
+        buildInitiativeDropdown(addButton, item, () => {
+          markChanged();
+          renderExpandedInitiatives();
+        });
+      });
+      footerInitiatives.appendChild(addButton);
+    }
+  };
+  renderExpandedInitiatives();
+  footer.appendChild(footerInitiatives);
+
+  const footerMeta = document.createElement('div');
+  footerMeta.className = 'card-expand-footer-meta';
+
   const sectionName = sections.find(s => s.id === item.section)?.name || '';
   if (sectionName) {
     const badge = document.createElement('span');
     badge.className = 'list-item-section';
     badge.textContent = sectionName;
-    footer.appendChild(badge);
+    footerMeta.appendChild(badge);
   }
 
   if (item.createdAt) {
     const created = document.createElement('span');
     created.className = 'list-item-section';
     created.textContent = `Created ${item.createdAt}`;
-    footer.appendChild(created);
+    footerMeta.appendChild(created);
   }
+  footer.appendChild(footerMeta);
 
   panel.appendChild(header);
   panel.appendChild(body);
