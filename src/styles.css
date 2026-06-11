@@ -1953,9 +1953,10 @@ button:disabled {
 
 .card-expand-body .note-editor-inline {
   flex: 0 0 auto;
-  max-height: min(320px, 40vh);
+  height: auto;
+  max-height: none;
   overflow-x: hidden;
-  overflow-y: auto;
+  overflow-y: hidden;
   overscroll-behavior: contain;
   scrollbar-gutter: stable;
 }

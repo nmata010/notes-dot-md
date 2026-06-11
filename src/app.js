@@ -320,6 +320,56 @@ function makeNoteEditor(item, large) {
   return editable;
 }
 
+function autoSizeExpandedNoteEditor(editor, body) {
+  let frame = null;
+
+  const resize = () => {
+    frame = null;
+    editor.style.height = 'auto';
+    editor.style.overflowY = 'hidden';
+
+    const bodyStyle = getComputedStyle(body);
+    const editorStyle = getComputedStyle(editor);
+    const children = [...body.children].filter(child => child.offsetParent !== null);
+    const gap = parseFloat(bodyStyle.rowGap || bodyStyle.gap) || 0;
+    const bodyPadding = (parseFloat(bodyStyle.paddingTop) || 0) + (parseFloat(bodyStyle.paddingBottom) || 0);
+    const reservedHeight = children
+      .filter(child => child !== editor)
+      .reduce((total, child) => total + child.offsetHeight, 0);
+    const availableHeight = Math.max(
+      60,
+      body.clientHeight - bodyPadding - reservedHeight - gap * Math.max(0, children.length - 1)
+    );
+    const editorBorders = (parseFloat(editorStyle.borderTopWidth) || 0) + (parseFloat(editorStyle.borderBottomWidth) || 0);
+    const contentHeight = Math.max(60, editor.scrollHeight + editorBorders);
+    const nextHeight = Math.min(contentHeight, availableHeight);
+
+    editor.style.height = `${nextHeight}px`;
+    editor.style.overflowY = contentHeight > availableHeight ? 'auto' : 'hidden';
+  };
+
+  const scheduleResize = () => {
+    if (frame !== null) cancelAnimationFrame(frame);
+    frame = requestAnimationFrame(resize);
+  };
+
+  const resizeObserver = new ResizeObserver(scheduleResize);
+  resizeObserver.observe(body);
+  const mutationObserver = new MutationObserver(scheduleResize);
+  mutationObserver.observe(body, { childList: true, subtree: true });
+  editor.addEventListener('input', scheduleResize);
+  window.addEventListener('resize', scheduleResize);
+  scheduleResize();
+
+  return () => {
+    if (frame !== null) cancelAnimationFrame(frame);
+    resizeObserver.disconnect();
+    mutationObserver.disconnect();
+    editor.removeEventListener('input', scheduleResize);
+    window.removeEventListener('resize', scheduleResize);
+  };
+}
+
 const board = document.getElementById('board');
 const listView = document.getElementById('listView');
 const listViewBtn = document.getElementById('listViewBtn');
@@ -706,6 +756,7 @@ function openCardExpanded(item, focusTarget = null) {
   let titleInput;
   let noteEditor = null;
   let subtaskAddInput = null;
+  let cleanupNoteEditorSizing = null;
 
   const close = () => {
     // Sync note editor state before removing overlay (Tab/Enter don't fire input events)
@@ -717,6 +768,7 @@ function openCardExpanded(item, focusTarget = null) {
     if (v && v !== item.title) {
       if (markdownCore.setWorkspaceCardTitle(getWorkspace(), item, v)) markChanged();
     }
+    cleanupNoteEditorSizing?.();
     document.querySelector('.initiative-dropdown')?.remove();
     overlay.remove();
     document.removeEventListener('keydown', escHandler);
@@ -996,6 +1048,7 @@ function openCardExpanded(item, focusTarget = null) {
   panel.appendChild(footer);
   overlay.appendChild(panel);
   document.body.appendChild(overlay);
+  cleanupNoteEditorSizing = autoSizeExpandedNoteEditor(taskNoteEditor, body);
 
   if (focusTarget === 'notes') {
     setTimeout(() => noteEditor?.focus(), 0);
