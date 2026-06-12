@@ -7,13 +7,12 @@ import {
   addCardToSection,
   addInitiative,
   addSection,
-  addSubtask,
   defaultFileName,
   deleteCard,
   deleteSection,
   deleteInitiative,
-  ensureSubtasks,
   ensureCardInitiatives,
+  getLinkedCardSectionId,
   getLinkedTasks,
   getInitiativeColor,
   getInitiativeUsageCount,
@@ -25,7 +24,6 @@ import {
   normalizeInitiativeName,
   removeCard,
   removeMeetingRefs,
-  removeSubtask,
   renameSection,
   setCardDueDate,
   setCardInitiatives,
@@ -34,9 +32,7 @@ import {
   setWorkspaceCardTitle,
   toggleCardChecked,
   toggleCardInitiative,
-  toggleSubtaskChecked,
   updateMeetingRefs,
-  updateSubtask,
   renameInitiative
 } from "../src/core/workspace.js";
 
@@ -58,6 +54,11 @@ assert.deepEqual(parsedStarter.sections.map(section => section.name), ["Notes", 
 assert.deepEqual(parsedStarter.initiatives, ["work", "personal"]);
 
 const workspace = createStarterWorkspace();
+assert.equal(getLinkedCardSectionId(workspace, { section: "notes" }), "to-do");
+assert.equal(
+  getLinkedCardSectionId({ sections: [{ id: "notes", name: "Notes" }] }, { section: "notes" }),
+  "notes"
+);
 const addedSection = addSection(workspace, "Ideas");
 assert.deepEqual(addedSection, { id: "ideas", name: "Ideas" });
 assert.deepEqual(workspace.tasks.ideas, []);
@@ -148,20 +149,6 @@ assert.deepEqual(linkedTask.notes, [{ text: "Decision captured", level: 0 }]);
 assert.equal(toggleCardChecked(linkedTask), true);
 assert.equal(linkedTask.checked, true);
 assert.equal(toggleCardChecked({ checked: false }), true);
-
-const subtaskCard = createCardForSection("Subtasks", "to-do", { id: "subtask-card" });
-assert.deepEqual(ensureSubtasks(subtaskCard), []);
-assert.deepEqual(addSubtask(subtaskCard, "  Draft outline  "), { text: "Draft outline", checked: false });
-assert.equal(addSubtask(subtaskCard, "   "), null);
-assert.equal(toggleSubtaskChecked(subtaskCard, 0), true);
-assert.equal(subtaskCard.subtasks[0].checked, true);
-assert.equal(updateSubtask(subtaskCard, 0, "  Draft revised outline  "), true);
-assert.equal(subtaskCard.subtasks[0].text, "Draft revised outline");
-assert.equal(updateSubtask(subtaskCard, 0, " "), true);
-assert.equal(subtaskCard.subtasks.length, 0);
-assert.deepEqual(addSubtask(subtaskCard, "Review"), { text: "Review", checked: false });
-assert.deepEqual(removeSubtask(subtaskCard, 0), { text: "Review", checked: false });
-assert.equal(removeSubtask(subtaskCard, 0), null);
 
 assert.equal(getInitiativeColor(workspace.initiatives, "work"), initiativeColorPalette[0]);
 assert.equal(getInitiativeColor(workspace.initiatives, "personal"), initiativeColorPalette[1]);

@@ -101,6 +101,10 @@ export function createCardForSection(title, sectionIdValue, options = {}) {
   return createCard(title, sectionIdValue, options);
 }
 
+export function getLinkedCardSectionId(workspace, parent) {
+  return workspace.sections.find(section => section.name.toLowerCase() === "to do")?.id || parent.section;
+}
+
 export function addCardToSection(workspace, sectionIdValue, card, position = "end") {
   if (!workspace.tasks[sectionIdValue]) workspace.tasks[sectionIdValue] = [];
   if (typeof position === "number" && position >= 0 && position <= workspace.tasks[sectionIdValue].length) {
@@ -256,46 +260,6 @@ export function toggleCardInitiative(card, initiative) {
 export function toggleCardChecked(card) {
   if (!card) return false;
   card.checked = !card.checked;
-  return true;
-}
-
-export function ensureSubtasks(card) {
-  if (!card.subtasks) card.subtasks = [];
-  return card.subtasks;
-}
-
-export function addSubtask(card, text) {
-  const trimmedText = text.trim();
-  if (!trimmedText) return null;
-  const subtask = { text: trimmedText, checked: false };
-  ensureSubtasks(card).push(subtask);
-  return subtask;
-}
-
-export function updateSubtask(card, index, text) {
-  const subtasks = ensureSubtasks(card);
-  if (!subtasks[index]) return false;
-
-  const trimmedText = text.trim();
-  if (!trimmedText) {
-    subtasks.splice(index, 1);
-    return true;
-  }
-
-  subtasks[index].text = trimmedText;
-  return true;
-}
-
-export function removeSubtask(card, index) {
-  const subtasks = ensureSubtasks(card);
-  if (!subtasks[index]) return null;
-  return subtasks.splice(index, 1)[0];
-}
-
-export function toggleSubtaskChecked(card, index) {
-  const subtasks = ensureSubtasks(card);
-  if (!subtasks[index]) return false;
-  subtasks[index].checked = !subtasks[index].checked;
   return true;
 }
 

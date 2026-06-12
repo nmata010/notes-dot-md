@@ -40,10 +40,16 @@ assert.deepEqual(todo.notes, [
   { text: "Show board view.", level: 0 },
   { text: "Show label filters.", level: 0 }
 ]);
-assert.deepEqual(todo.subtasks, [
-  { text: "Open sample file.", checked: false },
-  { text: "Check current palette.", checked: true }
-]);
+assert.deepEqual(todo.subtasks, []);
+
+const promotedOpen = workspace.tasks["to-do"].find(card => card.title === "Open sample file.");
+assert.equal(promotedOpen.checked, false);
+assert.deepEqual(promotedOpen.initiatives, ["product"]);
+assert.equal(promotedOpen.meetingRef, "record-demo-gif");
+const promotedPalette = workspace.tasks["to-do"].find(card => card.title === "Check current palette.");
+assert.equal(promotedPalette.checked, true);
+assert.deepEqual(promotedPalette.initiatives, ["product"]);
+assert.equal(promotedPalette.meetingRef, "record-demo-gif");
 
 const meeting = findMeetingBySlug(workspace, "roadmap-sync");
 assert.equal(meeting.title, "Roadmap sync");
@@ -55,7 +61,9 @@ assert.match(serialized, /- \[ \] \*\*Monday planning\*\* #product/);
 assert.match(serialized, /- \[ \] \*\*Record demo gif\*\* #product/);
 assert.match(serialized, /\t- \*\*Due:\*\* 2026-06-12/);
 assert.match(serialized, /\t- \*\*Relates to:\*\* Roadmap sync/);
-assert.match(serialized, /  - \[x\] Check current palette/);
+assert.match(serialized, /- \[x\] \*\*Check current palette\.\*\* #product/);
+assert.match(serialized, /\t- \*\*Relates to:\*\* Record demo gif/);
+assert.doesNotMatch(serialized, /  - \[[ x]\]/);
 assert.match(serialized, /---\n## Setup\n- product\n- team\n$/);
 
 const filtered = serializeFilteredMarkdown(workspace, new Set([todo.id]));
@@ -66,8 +74,6 @@ assert.equal(filtered, [
   "\t- **Relates to:** Roadmap sync",
   "\t- Show board view.",
   "\t- Show label filters.",
-  "  - [ ] Open sample file.",
-  "  - [x] Check current palette.",
   ""
 ].join("\n"));
 
@@ -88,7 +94,10 @@ assert.equal(currentCard.createdAt, "2026-06-10");
 assert.equal(currentCard.note, "2026-06-20");
 assert.equal(currentCard.meetingRef, "roadmap-sync");
 assert.deepEqual(currentCard.notes, [{ text: "Decision captured.", level: 0 }]);
-assert.deepEqual(currentCard.subtasks, [{ text: "Share the decision.", checked: false }]);
+assert.deepEqual(currentCard.subtasks, []);
+const fallbackLinkedCard = currentShape.tasks.notes.find(card => card.title === "Share the decision.");
+assert.equal(fallbackLinkedCard.meetingRef, "planning-notes");
+assert.deepEqual(fallbackLinkedCard.initiatives, ["team"]);
 
 const multipleInitiatives = parseMarkdown([
   "# Notes",

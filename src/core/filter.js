@@ -11,10 +11,6 @@ export function getCardSearchText(card, options = {}) {
   const initiatives = card.initiatives || (card.initiative ? [card.initiative] : []);
   const parts = [card.title, card.note, meetingTitle, ...initiatives];
 
-  if (card.subtasks) {
-    parts.push(...card.subtasks.map(subtask => subtask.text || subtask));
-  }
-
   if (card.notes) {
     parts.push(...card.notes.map(noteText));
   }

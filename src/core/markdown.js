@@ -144,6 +144,27 @@ export function parseMarkdown(content) {
 
   saveCurrentCard();
 
+  const toDoSection = resultSections.find(section => section.name.toLowerCase() === 'to do');
+  const cardsWithSubtasks = resultSections.flatMap(section => resultTasks[section.id] || []);
+  cardsWithSubtasks.forEach(parent => {
+    const destinationId = toDoSection?.id || parent.section;
+    (parent.subtasks || []).forEach(subtask => {
+      resultTasks[destinationId].push({
+        id: createId(),
+        title: subtask.text,
+        note: '',
+        checked: subtask.checked,
+        subtasks: [],
+        notes: [],
+        section: destinationId,
+        initiatives: [...parent.initiatives],
+        meetingRef: meetingSlug(parent.title),
+        createdAt: null
+      });
+    });
+    parent.subtasks = [];
+  });
+
   return { sections: resultSections, tasks: resultTasks, initiatives: resultInitiatives };
 }
 
@@ -165,10 +186,6 @@ function serializeCards(cards, workspace) {
     (card.notes || []).forEach(noteValue => {
       const note = typeof noteValue === 'string' ? { text: noteValue, level: 0 } : noteValue;
       md += `${'\t'.repeat(note.level + 1)}- ${note.text}\n`;
-    });
-    (card.subtasks || []).forEach(subtask => {
-      const stCheckbox = subtask.checked ? '[x]' : '[ ]';
-      md += `  - ${stCheckbox} ${subtask.text}\n`;
     });
   });
   return md;

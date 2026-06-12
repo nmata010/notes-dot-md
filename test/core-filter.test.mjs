@@ -11,14 +11,13 @@ const task = {
   note: "2026-06-12",
   initiatives: ["product", "marketing"],
   meetingRef: "roadmap-sync",
-  notes: [{ text: "Show board view.", level: 0 }, "Copy filtered tasks."],
-  subtasks: [{ text: "Open sample file.", checked: false }]
+  notes: [{ text: "Show board view.", level: 0 }, "Copy filtered tasks."]
 };
 
 assert.equal(normalizeSearchText(" Product "), " product ");
 assert.equal(
   getCardSearchText(task, { meetingTitle: "Roadmap sync" }),
-  "record demo gif 2026-06-12 roadmap sync product marketing open sample file. show board view. copy filtered tasks."
+  "record demo gif 2026-06-12 roadmap sync product marketing show board view. copy filtered tasks."
 );
 
 const data = getCardFilterData(task, { meetingTitle: "Roadmap sync" });

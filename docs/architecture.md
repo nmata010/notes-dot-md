@@ -40,7 +40,7 @@ Current conventions:
 - Checkbox list items become cards. Every newly serialized card uses this form.
 - Bold non-checkbox list items are accepted as legacy cards for backward compatibility.
 - `Created`, `Due`, and `Relates to` use bold nested metadata lines.
-- Other nested bullets become notes; nested checkbox bullets become subtasks.
+- Other nested bullets become notes; legacy nested checkbox bullets are promoted to standalone linked cards when the file is loaded.
 - The setup block after `---` stores initiatives.
 - Cards store zero or more initiatives as contiguous trailing hashtags, such as `#product #marketing`.
 - Existing setup initiative names containing spaces are preserved and used to parse legacy trailing tags.

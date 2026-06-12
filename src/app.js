@@ -777,7 +777,6 @@ function openCardExpanded(item, focusTarget = null) {
 
   let titleInput;
   let noteEditor = null;
-  let subtaskAddInput = null;
   let cleanupNoteEditorSizing = null;
 
   const close = () => {
@@ -873,75 +872,6 @@ function openCardExpanded(item, focusTarget = null) {
     taskNoteEditor.style.borderRadius = '8px';
     body.appendChild(taskNoteEditor);
 
-    const subtasksLabel = document.createElement('div');
-    subtasksLabel.className = 'card-expand-label';
-    subtasksLabel.style.marginTop = '20px';
-    subtasksLabel.textContent = 'Subtasks';
-    body.appendChild(subtasksLabel);
-
-    const subtasksList = document.createElement('div');
-    subtasksList.className = 'card-expand-subtasks';
-    body.appendChild(subtasksList);
-
-    const renderSubtasks = () => {
-      subtasksList.innerHTML = '';
-      (item.subtasks || []).forEach((st, idx) => {
-        const row = document.createElement('div');
-        row.className = 'card-expand-subtask-row';
-
-        const stCheck = document.createElement('span');
-        stCheck.className = `checkbox ${st.checked ? 'checked' : ''}`;
-        stCheck.style.cssText = 'width: 18px; height: 18px; min-width: 18px; flex-shrink: 0;';
-        stCheck.addEventListener('click', () => {
-          markdownCore.toggleSubtaskChecked(item, idx);
-          stCheck.classList.toggle('checked', st.checked);
-          if (st.checked) { stInput.style.textDecoration = 'line-through'; stInput.style.color = 'var(--text-muted)'; }
-          else { stInput.style.textDecoration = ''; stInput.style.color = ''; }
-          checkAutoMoveToDone(item);
-          markChanged();
-        });
-
-        const stInput = document.createElement('input');
-        stInput.type = 'text';
-        stInput.value = st.text;
-        stInput.className = 'card-expand-subtask-input';
-        if (st.checked) { stInput.style.textDecoration = 'line-through'; stInput.style.color = 'var(--text-muted)'; }
-        stInput.addEventListener('blur', () => {
-          const v = stInput.value.trim();
-          markdownCore.updateSubtask(item, idx, v);
-          markChanged();
-          if (!v) renderSubtasks();
-        });
-        stInput.addEventListener('keydown', (e) => {
-          if (e.key === 'Enter') { e.preventDefault(); stInput.blur(); }
-          if (e.key === 'Backspace' && stInput.value === '') { e.preventDefault(); markdownCore.removeSubtask(item, idx); markChanged(); renderSubtasks(); }
-        });
-
-        row.appendChild(stCheck);
-        row.appendChild(stInput);
-        subtasksList.appendChild(row);
-      });
-
-      const addRow = document.createElement('div');
-      addRow.className = 'card-expand-subtask-row';
-      const addInput = document.createElement('input');
-      addInput.type = 'text';
-      addInput.placeholder = '+ Add subtask...';
-      addInput.className = 'card-expand-subtask-input';
-      subtaskAddInput = addInput;
-      addInput.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-          e.preventDefault();
-          const v = addInput.value.trim();
-          if (markdownCore.addSubtask(item, v)) { markChanged(); renderSubtasks(); }
-        }
-      });
-      addRow.appendChild(addInput);
-      subtasksList.appendChild(addRow);
-    };
-
-    renderSubtasks();
-
     const linkedSection = document.createElement('div');
     linkedSection.className = 'linked-tasks-section';
     const linkedLabel = document.createElement('div');
@@ -996,7 +926,7 @@ function openCardExpanded(item, focusTarget = null) {
           e.preventDefault();
           const title = addInput.value.trim();
           if (!title || sections.length === 0) return;
-          const targetSection = (sections.find(section => section.id !== item.section) || sections[0]).id;
+          const targetSection = markdownCore.getLinkedCardSectionId({ sections }, item);
           const linkedCard = markdownCore.createCard(title, targetSection, {
             initiatives: cardInitiatives(item),
             meetingRef: slug
@@ -1049,6 +979,19 @@ function openCardExpanded(item, focusTarget = null) {
   const footerMeta = document.createElement('div');
   footerMeta.className = 'card-expand-footer-meta';
 
+  if (item.meetingRef) {
+    const parent = findMeetingBySlug(item.meetingRef);
+    const parentBadge = document.createElement('span');
+    parentBadge.className = 'meeting-ref-badge';
+    parentBadge.textContent = parent ? parent.title : item.meetingRef;
+    parentBadge.title = parent ? parent.title : item.meetingRef;
+    parentBadge.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (parent) openCardExpanded(parent);
+    });
+    footerMeta.appendChild(parentBadge);
+  }
+
   const sectionName = sections.find(s => s.id === item.section)?.name || '';
   if (sectionName) {
     const badge = document.createElement('span');
@@ -1074,8 +1017,6 @@ function openCardExpanded(item, focusTarget = null) {
 
   if (focusTarget === 'notes') {
     setTimeout(() => noteEditor?.focus(), 0);
-  } else if (focusTarget === 'subtask') {
-    setTimeout(() => subtaskAddInput?.focus(), 0);
   }
 }
 
@@ -1091,7 +1032,6 @@ function createCard(task) {
 
   let html = `
     <button class="card-expand-btn" data-action="expand" title="Expand"><svg width="11" height="11" viewBox="0 0 11 11" fill="none" style="pointer-events:none"><path d="M7 1h3v3M4 10H1V7M10 1L6.5 4.5M1 10L4.5 6.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button>
-    <button class="card-add-subtask-btn" data-action="add-subtask" title="Add subtask" aria-label="Add subtask"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" style="pointer-events:none"><rect x="1.5" y="1.5" width="9" height="9" rx="2" stroke="currentColor" stroke-width="1.4"/><path d="M12.5 8v6M9.5 11h6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg></button>
     <div class="card-heading-row">
       <button class="delete-btn" data-action="delete" title="Delete card">&times;</button>
       <span class="checkbox ${task.checked ? 'checked' : ''}" data-action="toggle"></span>
@@ -1119,17 +1059,6 @@ function createCard(task) {
     if (collapsible) {
       html += `<div class="note-expand-btn" data-action="toggle-notes" style="margin-left: 30px;">${collapsed ? 'See more' : 'See less'}</div>`;
     }
-  }
-
-  if (task.subtasks.length > 0) {
-    html += '<div class="card-subtasks" style="margin-left: 30px;">';
-    task.subtasks.forEach((st, idx) => {
-      html += `<div class="subtask">
-        <span class="checkbox ${st.checked ? 'checked' : ''}" data-action="toggle-sub" data-idx="${idx}" style="width: 16px; height: 16px; min-width: 16px; min-height: 16px;"></span>
-        <span data-action="edit-subtask" data-idx="${idx}" style="cursor: pointer;">${st.text}</span>
-      </div>`;
-    });
-    html += '</div>';
   }
 
   card.innerHTML = html;
@@ -1173,19 +1102,8 @@ function createCard(task) {
       checkAutoMoveToDone(task);
       markChanged();
       renderTasks();
-    } else if (action === 'toggle-sub') {
-      const idx = parseInt(e.target.dataset.idx);
-      markdownCore.toggleSubtaskChecked(task, idx);
-      checkAutoMoveToDone(task);
-      markChanged();
-      renderTasks();
     } else if (action === 'edit-title') {
       startEditingTitle(e.target, task);
-    } else if (action === 'edit-subtask') {
-      const idx = parseInt(e.target.dataset.idx);
-      startEditingSubtask(e.target, task, idx);
-    } else if (action === 'add-subtask') {
-      openCardExpanded(task, 'subtask');
     } else if (action === 'delete') {
       deleteTask(task);
     } else if (action === 'expand') {
@@ -1407,58 +1325,6 @@ function startEditingNote(noteEl, task) {
   };
 
   input.addEventListener('change', saveEdit);
-  input.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') { e.preventDefault(); saveEdit(); }
-    else if (e.key === 'Escape') { saved = true; renderTasks(); }
-  });
-  input.addEventListener('blur', saveEdit);
-}
-
-function startEditingSubtask(subtaskEl, task, idx) {
-  const input = document.createElement('input');
-  input.type = 'text';
-  input.value = task.subtasks[idx].text;
-  input.style.cssText = 'width: calc(100% - 30px); background: var(--bg-card); border: 2px solid var(--accent); border-radius: 4px; padding: 2px 6px; color: var(--text-primary); font-size: 13px; font-family: inherit; outline: none;';
-
-  subtaskEl.replaceWith(input);
-  input.focus();
-  input.select();
-
-  let saved = false;
-  const saveEdit = () => {
-    if (saved) return;
-    saved = true;
-    const newText = input.value.trim();
-    markdownCore.updateSubtask(task, idx, newText);
-    markChanged();
-    renderTasks();
-  };
-
-  input.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') { e.preventDefault(); saveEdit(); }
-    else if (e.key === 'Escape') { saved = true; renderTasks(); }
-  });
-  input.addEventListener('blur', saveEdit);
-}
-
-function startAddingSubtask(el, task) {
-  const input = document.createElement('input');
-  input.type = 'text';
-  input.placeholder = 'New subtask...';
-  input.style.cssText = 'width: calc(100% - 10px); background: var(--bg-card); border: 2px solid var(--accent); border-radius: 4px; padding: 2px 6px; color: var(--text-primary); font-size: 13px; font-family: inherit; outline: none;';
-
-  el.replaceWith(input);
-  input.focus();
-
-  let saved = false;
-  const saveEdit = () => {
-    if (saved) return;
-    saved = true;
-    const text = input.value.trim();
-    if (markdownCore.addSubtask(task, text)) markChanged();
-    renderTasks();
-  };
-
   input.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') { e.preventDefault(); saveEdit(); }
     else if (e.key === 'Escape') { saved = true; renderTasks(); }
@@ -2195,43 +2061,6 @@ function createListItem(task, section) {
     }
   }
 
-  if (task.subtasks && task.subtasks.length > 0) {
-    const subtasksContainer = document.createElement('div');
-    subtasksContainer.className = 'list-item-subtasks';
-
-    task.subtasks.forEach((st, idx) => {
-      const subtaskEl = document.createElement('div');
-      subtaskEl.className = 'list-item-subtask';
-
-      const stCheckbox = document.createElement('span');
-      stCheckbox.className = `checkbox ${st.checked ? 'checked' : ''}`;
-      stCheckbox.addEventListener('click', (e) => {
-        e.stopPropagation();
-        markdownCore.toggleSubtaskChecked(task, idx);
-        checkAutoMoveToDone(task);
-        markChanged();
-        renderTasks();
-      });
-
-      const stText = document.createElement('span');
-      stText.textContent = st.text;
-      if (st.checked) {
-        stText.style.textDecoration = 'line-through';
-        stText.style.color = 'var(--text-muted)';
-      }
-      stText.addEventListener('click', (e) => {
-        e.stopPropagation();
-        startEditingListSubtask(stText, task, idx);
-      });
-
-      subtaskEl.appendChild(stCheckbox);
-      subtaskEl.appendChild(stText);
-      subtasksContainer.appendChild(subtaskEl);
-    });
-
-    content.appendChild(subtasksContainer);
-  }
-
   if (initiatives.length > 0 || cardInitiatives(task).length > 0 || task.meetingRef) {
     const metaRow = document.createElement('div');
     metaRow.className = 'card-meta-row';
@@ -2261,11 +2090,6 @@ function createListItem(task, section) {
 
   const actions = document.createElement('div');
   actions.className = 'list-item-actions';
-  const addSubtaskBtn = document.createElement('button');
-  addSubtaskBtn.title = 'Add subtask';
-  addSubtaskBtn.setAttribute('aria-label', 'Add subtask');
-  addSubtaskBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" style="pointer-events:none"><rect x="1.5" y="1.5" width="9" height="9" rx="2" stroke="currentColor" stroke-width="1.4"/><path d="M12.5 8v6M9.5 11h6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>';
-  addSubtaskBtn.addEventListener('click', (e) => { e.stopPropagation(); openCardExpanded(task, 'subtask'); });
   const expandListBtn = document.createElement('button');
   expandListBtn.title = 'Expand';
   expandListBtn.innerHTML = '<svg width="11" height="11" viewBox="0 0 11 11" fill="none" style="pointer-events:none"><path d="M7 1h3v3M4 10H1V7M10 1L6.5 4.5M1 10L4.5 6.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>';
@@ -2274,7 +2098,6 @@ function createListItem(task, section) {
   deleteListBtn.title = 'Delete card';
   deleteListBtn.innerHTML = '&times;';
   deleteListBtn.addEventListener('click', (e) => { e.stopPropagation(); deleteTask(task); });
-  actions.appendChild(addSubtaskBtn);
   actions.appendChild(expandListBtn);
   actions.appendChild(deleteListBtn);
   item.appendChild(actions);
@@ -2352,7 +2175,7 @@ function createNoteListItem(item) {
   }
 
   const hint = document.createElement('div');
-  hint.className = 'list-item-add-subtask';
+  hint.className = 'list-item-edit-notes';
   hint.textContent = item.notes.length > 0 ? '✎ Edit notes' : '+ Add notes';
   notesArea.appendChild(hint);
 
@@ -2399,58 +2222,6 @@ function startEditingListNote(noteEl, task) {
   };
 
   input.addEventListener('change', saveEdit);
-  input.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') { e.preventDefault(); saveEdit(); }
-    else if (e.key === 'Escape') { saved = true; renderTasks(); }
-  });
-  input.addEventListener('blur', saveEdit);
-}
-
-function startEditingListSubtask(subtaskEl, task, idx) {
-  const input = document.createElement('input');
-  input.type = 'text';
-  input.value = task.subtasks[idx].text;
-  input.style.cssText = 'width: calc(100% - 30px); background: var(--bg-card); border: 2px solid var(--accent); border-radius: 4px; padding: 2px 6px; color: var(--text-primary); font-size: 13px; font-family: inherit; outline: none;';
-
-  subtaskEl.replaceWith(input);
-  input.focus();
-  input.select();
-
-  let saved = false;
-  const saveEdit = () => {
-    if (saved) return;
-    saved = true;
-    const newText = input.value.trim();
-    markdownCore.updateSubtask(task, idx, newText);
-    markChanged();
-    renderTasks();
-  };
-
-  input.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') { e.preventDefault(); saveEdit(); }
-    else if (e.key === 'Escape') { saved = true; renderTasks(); }
-  });
-  input.addEventListener('blur', saveEdit);
-}
-
-function startAddingListSubtask(el, task) {
-  const input = document.createElement('input');
-  input.type = 'text';
-  input.placeholder = 'New subtask...';
-  input.style.cssText = 'width: calc(100% - 10px); background: var(--bg-card); border: 2px solid var(--accent); border-radius: 4px; padding: 2px 6px; color: var(--text-primary); font-size: 13px; font-family: inherit; outline: none;';
-
-  el.replaceWith(input);
-  input.focus();
-
-  let saved = false;
-  const saveEdit = () => {
-    if (saved) return;
-    saved = true;
-    const text = input.value.trim();
-    if (markdownCore.addSubtask(task, text)) markChanged();
-    renderTasks();
-  };
-
   input.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') { e.preventDefault(); saveEdit(); }
     else if (e.key === 'Escape') { saved = true; renderTasks(); }
