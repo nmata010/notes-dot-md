@@ -768,9 +768,277 @@ function createInitiativePills(item) {
   return container;
 }
 
+let cardMetadataDismiss = null;
+let cardMetadataTrigger = null;
+
+function closeCardMetadataPopover({ restoreFocus = false } = {}) {
+  document.querySelector('.card-metadata-popover')?.remove();
+  if (cardMetadataDismiss) {
+    document.removeEventListener('click', cardMetadataDismiss, true);
+    cardMetadataDismiss = null;
+  }
+  if (restoreFocus) cardMetadataTrigger?.focus();
+  cardMetadataTrigger = null;
+}
+
+function positionCardMetadataPopover(popover, anchor) {
+  document.body.appendChild(popover);
+  const rect = anchor.getBoundingClientRect();
+  const width = Math.min(300, window.innerWidth - 24);
+  const left = Math.min(Math.max(12, rect.left), window.innerWidth - width - 12);
+  popover.style.width = `${width}px`;
+  popover.style.left = `${left}px`;
+  popover.style.top = `${Math.max(12, Math.min(rect.bottom + 6, window.innerHeight - popover.offsetHeight - 12))}px`;
+}
+
+function showDueDatePopover(anchor, item, onChange = null) {
+  closeCardMetadataPopover();
+  cardMetadataTrigger = anchor;
+
+  const popover = document.createElement('div');
+  popover.className = 'card-metadata-popover';
+
+  const heading = document.createElement('div');
+  heading.className = 'card-metadata-popover-heading';
+  const headingText = document.createElement('span');
+  headingText.textContent = item.note ? 'Change due date' : 'Set due date';
+  const escapeHint = document.createElement('span');
+  escapeHint.className = 'card-metadata-escape';
+  escapeHint.textContent = 'Esc';
+  heading.appendChild(headingText);
+  heading.appendChild(escapeHint);
+  popover.appendChild(heading);
+
+  const input = document.createElement('input');
+  input.type = 'date';
+  input.value = item.note || '';
+  input.className = 'card-metadata-date-input';
+  popover.appendChild(input);
+
+  const saveDate = value => {
+    markdownCore.setCardDueDate(item, value);
+    markChanged();
+    closeCardMetadataPopover();
+    onChange?.();
+  };
+
+  input.addEventListener('change', () => saveDate(input.value));
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      e.stopPropagation();
+      closeCardMetadataPopover({ restoreFocus: true });
+    }
+  });
+
+  const quickActions = document.createElement('div');
+  quickActions.className = 'card-metadata-quick-actions';
+  [
+    ['Today', 0],
+    ['Tomorrow', 1],
+    ['Next week', 7]
+  ].forEach(([label, days]) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.textContent = label;
+    button.addEventListener('click', () => {
+      const date = new Date();
+      date.setDate(date.getDate() + days);
+      saveDate(markdownCore.localDateString(date));
+    });
+    quickActions.appendChild(button);
+  });
+  popover.appendChild(quickActions);
+
+  const footer = document.createElement('div');
+  footer.className = 'card-metadata-popover-footer';
+  if (item.note) {
+    const clear = document.createElement('button');
+    clear.type = 'button';
+    clear.className = 'card-metadata-clear';
+    clear.textContent = 'Clear due date';
+    clear.addEventListener('click', () => saveDate(''));
+    footer.appendChild(clear);
+  }
+  const done = document.createElement('button');
+  done.type = 'button';
+  done.className = 'card-metadata-done';
+  done.textContent = 'Done';
+  done.addEventListener('click', () => closeCardMetadataPopover({ restoreFocus: true }));
+  footer.appendChild(done);
+  popover.appendChild(footer);
+
+  popover.addEventListener('click', e => e.stopPropagation());
+  positionCardMetadataPopover(popover, anchor);
+  input.focus();
+  input.showPicker?.();
+
+  setTimeout(() => {
+    cardMetadataDismiss = e => {
+      if (!popover.contains(e.target) && e.target !== anchor) {
+        closeCardMetadataPopover();
+      }
+    };
+    document.addEventListener('click', cardMetadataDismiss, true);
+  }, 0);
+}
+
+function showParentPicker(anchor, item, onChange = null) {
+  closeCardMetadataPopover();
+  cardMetadataTrigger = anchor;
+
+  const popover = document.createElement('div');
+  popover.className = 'card-metadata-popover';
+  const heading = document.createElement('div');
+  heading.className = 'card-metadata-popover-heading';
+  const headingText = document.createElement('span');
+  headingText.textContent = item.meetingRef ? 'Change parent' : 'Add parent';
+  const escapeHint = document.createElement('span');
+  escapeHint.className = 'card-metadata-escape';
+  escapeHint.textContent = 'Esc';
+  heading.appendChild(headingText);
+  heading.appendChild(escapeHint);
+  popover.appendChild(heading);
+
+  const search = document.createElement('input');
+  search.type = 'search';
+  search.className = 'card-metadata-search-input';
+  search.placeholder = 'Search cards...';
+  popover.appendChild(search);
+
+  const results = document.createElement('div');
+  results.className = 'card-metadata-results';
+  popover.appendChild(results);
+
+  const candidates = sections.flatMap(section => (tasks[section.id] || []).map(card => ({
+    card,
+    sectionName: section.name
+  }))).filter(candidate => candidate.card !== item);
+  let highlightedIndex = Math.max(0, candidates.findIndex(candidate => meetingSlug(candidate.card.title) === item.meetingRef));
+  let visibleCandidates = [];
+
+  const chooseParent = parent => {
+    markdownCore.setCardParent(item, parent?.title || '');
+    markChanged();
+    closeCardMetadataPopover();
+    onChange?.();
+  };
+
+  const renderResults = () => {
+    const query = search.value.trim().toLowerCase();
+    visibleCandidates = candidates.filter(({ card }) => !query || card.title.toLowerCase().includes(query));
+    highlightedIndex = Math.min(highlightedIndex, Math.max(0, visibleCandidates.length - 1));
+    results.innerHTML = '';
+    visibleCandidates.forEach(({ card, sectionName }, index) => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = `card-metadata-result${index === highlightedIndex ? ' highlighted' : ''}`;
+      const title = document.createElement('span');
+      title.textContent = card.title;
+      const section = document.createElement('small');
+      section.textContent = sectionName;
+      button.appendChild(title);
+      button.appendChild(section);
+      button.addEventListener('click', () => chooseParent(card));
+      results.appendChild(button);
+    });
+    if (visibleCandidates.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'card-metadata-empty';
+      empty.textContent = 'No matching cards';
+      results.appendChild(empty);
+    }
+  };
+
+  search.addEventListener('input', () => { highlightedIndex = 0; renderResults(); });
+  search.addEventListener('keydown', e => {
+    if (e.key === 'ArrowDown' && visibleCandidates.length > 0) {
+      e.preventDefault();
+      highlightedIndex = (highlightedIndex + 1) % visibleCandidates.length;
+      renderResults();
+    } else if (e.key === 'ArrowUp' && visibleCandidates.length > 0) {
+      e.preventDefault();
+      highlightedIndex = (highlightedIndex - 1 + visibleCandidates.length) % visibleCandidates.length;
+      renderResults();
+    } else if (e.key === 'Enter' && visibleCandidates[highlightedIndex]) {
+      e.preventDefault();
+      chooseParent(visibleCandidates[highlightedIndex].card);
+    } else if (e.key === 'Escape') {
+      e.stopPropagation();
+      closeCardMetadataPopover({ restoreFocus: true });
+    }
+  });
+
+  const footer = document.createElement('div');
+  footer.className = 'card-metadata-popover-footer';
+  if (item.meetingRef) {
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.className = 'card-metadata-clear';
+    remove.textContent = 'Remove parent';
+    remove.addEventListener('click', () => chooseParent(null));
+    footer.appendChild(remove);
+  }
+  const done = document.createElement('button');
+  done.type = 'button';
+  done.className = 'card-metadata-done';
+  done.textContent = 'Done';
+  done.addEventListener('click', () => closeCardMetadataPopover({ restoreFocus: true }));
+  footer.appendChild(done);
+  popover.appendChild(footer);
+
+  renderResults();
+  popover.addEventListener('click', e => e.stopPropagation());
+  positionCardMetadataPopover(popover, anchor);
+  search.focus();
+
+  setTimeout(() => {
+    cardMetadataDismiss = e => {
+      if (!popover.contains(e.target) && e.target !== anchor) {
+        closeCardMetadataPopover();
+      }
+    };
+    document.addEventListener('click', cardMetadataDismiss, true);
+  }, 0);
+}
+
+function createCompactMetadata(item, onChange = renderTasks) {
+  const row = document.createElement('div');
+  row.className = 'card-primary-meta';
+
+  const due = document.createElement('button');
+  due.type = 'button';
+  due.className = `card-due-control${item.note ? '' : ' empty'}${item.note && isOverdue(item.note) ? ' overdue' : ''}`;
+  due.textContent = item.note ? formatDueDate(item.note) : '+ Due';
+  due.addEventListener('click', e => {
+    e.stopPropagation();
+    showDueDatePopover(due, item, onChange);
+  });
+  row.appendChild(due);
+
+  if (item.meetingRef) {
+    const parent = findMeetingBySlug(item.meetingRef);
+    const divider = document.createElement('span');
+    divider.className = 'card-primary-meta-divider';
+    row.appendChild(divider);
+    const badge = document.createElement('button');
+    badge.type = 'button';
+    badge.className = 'meeting-ref-badge';
+    badge.textContent = parent ? parent.title : item.meetingRef;
+    badge.title = parent ? parent.title : item.meetingRef;
+    badge.addEventListener('click', e => {
+      e.stopPropagation();
+      if (parent) openCardExpanded(parent);
+    });
+    row.appendChild(badge);
+  }
+
+  return row;
+}
+
 function openCardExpanded(item, focusTarget = null) {
   document.querySelector('.card-expand-overlay')?.remove();
   document.querySelector('.initiative-dropdown')?.remove();
+  closeCardMetadataPopover();
 
   const overlay = document.createElement('div');
   overlay.className = 'card-expand-overlay';
@@ -841,25 +1109,67 @@ function openCardExpanded(item, focusTarget = null) {
   const body = document.createElement('div');
   body.className = 'card-expand-body';
 
+  const properties = document.createElement('div');
+  properties.className = 'card-expand-properties';
+
+  const dueProperty = document.createElement('button');
+  dueProperty.type = 'button';
+  dueProperty.className = 'card-expand-property';
+  const renderDueProperty = () => {
+    dueProperty.innerHTML = '';
+    const content = document.createElement('span');
+    content.className = 'card-expand-property-content';
+    const label = document.createElement('span');
+    label.className = 'card-expand-property-label';
+    label.textContent = 'Due';
+    const value = document.createElement('span');
+    value.className = `card-expand-property-value${item.note && isOverdue(item.note) ? ' overdue' : ''}${item.note ? '' : ' empty'}`;
+    value.textContent = item.note ? formatDueDate(item.note) : 'None';
+    content.appendChild(label);
+    content.appendChild(value);
+    dueProperty.appendChild(content);
+  };
+  dueProperty.addEventListener('click', e => {
+    e.stopPropagation();
+    showDueDatePopover(dueProperty, item, () => {
+      renderDueProperty();
+      renderTasks();
+    });
+  });
+  renderDueProperty();
+  properties.appendChild(dueProperty);
+
+  const parentProperty = document.createElement('button');
+  parentProperty.type = 'button';
+  parentProperty.className = 'card-expand-property';
+  const renderParentProperty = () => {
+    parentProperty.innerHTML = '';
+    const content = document.createElement('span');
+    content.className = 'card-expand-property-content';
+    const label = document.createElement('span');
+    label.className = 'card-expand-property-label';
+    label.textContent = 'Parent';
+    const value = document.createElement('span');
+    value.className = `card-expand-property-value${item.meetingRef ? '' : ' empty'}`;
+    const parent = item.meetingRef ? findMeetingBySlug(item.meetingRef) : null;
+    value.textContent = item.meetingRef ? (parent?.title || item.meetingRef) : 'None';
+    content.appendChild(label);
+    content.appendChild(value);
+    parentProperty.appendChild(content);
+  };
+  parentProperty.addEventListener('click', e => {
+    e.stopPropagation();
+    showParentPicker(parentProperty, item, () => {
+      renderParentProperty();
+      renderTasks();
+    });
+  });
+  renderParentProperty();
+  properties.appendChild(parentProperty);
+
   // Every card shares the same editing surface.
-    const dueDateLabel = document.createElement('div');
-    dueDateLabel.className = 'card-expand-label';
-    dueDateLabel.textContent = 'Due Date';
-    body.appendChild(dueDateLabel);
-
-    const dueDateRow = document.createElement('div');
-    dueDateRow.className = 'card-expand-due-row';
-    const dueDateInput = document.createElement('input');
-    dueDateInput.type = 'date';
-    dueDateInput.value = item.note || '';
-    dueDateInput.className = 'card-expand-date-input';
-    dueDateInput.addEventListener('change', () => { markdownCore.setCardDueDate(item, dueDateInput.value); markChanged(); });
-    dueDateRow.appendChild(dueDateInput);
-    body.appendChild(dueDateRow);
-
     const notesLabel = document.createElement('div');
     notesLabel.className = 'card-expand-label';
-    notesLabel.style.marginTop = '20px';
     notesLabel.textContent = 'Notes';
     body.appendChild(notesLabel);
 
@@ -979,19 +1289,6 @@ function openCardExpanded(item, focusTarget = null) {
   const footerMeta = document.createElement('div');
   footerMeta.className = 'card-expand-footer-meta';
 
-  if (item.meetingRef) {
-    const parent = findMeetingBySlug(item.meetingRef);
-    const parentBadge = document.createElement('span');
-    parentBadge.className = 'meeting-ref-badge';
-    parentBadge.textContent = parent ? parent.title : item.meetingRef;
-    parentBadge.title = parent ? parent.title : item.meetingRef;
-    parentBadge.addEventListener('click', (e) => {
-      e.stopPropagation();
-      if (parent) openCardExpanded(parent);
-    });
-    footerMeta.appendChild(parentBadge);
-  }
-
   const sectionName = sections.find(s => s.id === item.section)?.name || '';
   if (sectionName) {
     const badge = document.createElement('span');
@@ -1009,6 +1306,7 @@ function openCardExpanded(item, focusTarget = null) {
   footer.appendChild(footerMeta);
 
   panel.appendChild(header);
+  panel.appendChild(properties);
   panel.appendChild(body);
   panel.appendChild(footer);
   overlay.appendChild(panel);
@@ -1039,11 +1337,6 @@ function createCard(task) {
     </div>
   `;
 
-  if (task.note) {
-    const overdue = isOverdue(task.note);
-    html += `<div class="card-note${overdue ? ' overdue' : ''}" style="margin-left: 30px;">${formatDueDate(task.note)}</div>`;
-  }
-
   if (task.notes && task.notes.length > 0) {
     const collapsible = isNotesPreviewCollapsible(task.notes);
     const collapsed = collapsible && !task.notesExpanded;
@@ -1062,27 +1355,12 @@ function createCard(task) {
   }
 
   card.innerHTML = html;
+  card.querySelector('.card-heading-row')?.after(createCompactMetadata(task));
 
-  if (initiatives.length > 0 || cardInitiatives(task).length > 0 || task.meetingRef) {
+  if (initiatives.length > 0 || cardInitiatives(task).length > 0) {
     const metaRow = document.createElement('div');
     metaRow.className = 'card-meta-row';
-    if (initiatives.length > 0 || cardInitiatives(task).length > 0) {
-      metaRow.appendChild(createInitiativePills(task));
-    } else {
-      metaRow.appendChild(document.createElement('span'));
-    }
-    if (task.meetingRef) {
-      const meeting = findMeetingBySlug(task.meetingRef);
-      const badge = document.createElement('span');
-      badge.className = 'meeting-ref-badge';
-      badge.textContent = meeting ? meeting.title : task.meetingRef;
-      badge.title = meeting ? meeting.title : task.meetingRef;
-      badge.addEventListener('click', (e) => {
-        e.stopPropagation();
-        if (meeting) openCardExpanded(meeting);
-      });
-      metaRow.appendChild(badge);
-    }
+    metaRow.appendChild(createInitiativePills(task));
     card.appendChild(metaRow);
   }
 
@@ -1148,6 +1426,7 @@ function createNoteCard(item) {
   header.appendChild(titleEl);
 
   card.appendChild(header);
+  card.appendChild(createCompactMetadata(item));
 
   // Notes area — click anywhere to open textarea
   const notesArea = document.createElement('div');
@@ -1216,7 +1495,7 @@ function createNoteCard(item) {
 
   if (initiatives.length > 0 || cardInitiatives(item).length > 0) {
     const pillRow = document.createElement('div');
-    pillRow.style.cssText = 'display: flex; justify-content: flex-start; margin-top: 8px;';
+    pillRow.className = 'card-meta-row';
     pillRow.appendChild(createInitiativePills(item));
     card.appendChild(pillRow);
   }
@@ -1298,33 +1577,6 @@ function startEditingTitle(titleEl, task) {
     renderTasks();
   };
 
-  input.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') { e.preventDefault(); saveEdit(); }
-    else if (e.key === 'Escape') { saved = true; renderTasks(); }
-  });
-  input.addEventListener('blur', saveEdit);
-}
-
-function startEditingNote(noteEl, task) {
-  const input = document.createElement('input');
-  input.type = 'date';
-  input.value = task.note || '';
-  input.style.cssText = 'background: var(--bg-card); border: 2px solid var(--accent); border-radius: 6px; padding: 4px 8px; color: var(--text-primary); font-size: 13px; font-family: inherit; outline: none; margin-left: 30px;';
-
-  noteEl.replaceWith(input);
-  input.focus();
-  input.showPicker?.();
-
-  let saved = false;
-  const saveEdit = () => {
-    if (saved) return;
-    saved = true;
-    markdownCore.setCardDueDate(task, input.value);
-    markChanged();
-    renderTasks();
-  };
-
-  input.addEventListener('change', saveEdit);
   input.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') { e.preventDefault(); saveEdit(); }
     else if (e.key === 'Escape') { saved = true; renderTasks(); }
@@ -2004,26 +2256,7 @@ function createListItem(task, section) {
     startEditingListItem(title, task);
   });
   content.appendChild(title);
-
-  if (task.note) {
-    const note = document.createElement('div');
-    note.className = 'list-item-note' + (isOverdue(task.note) ? ' overdue' : '');
-    note.textContent = formatDueDate(task.note);
-    note.addEventListener('click', (e) => {
-      e.stopPropagation();
-      startEditingListNote(note, task);
-    });
-    content.appendChild(note);
-  } else {
-    const addNote = document.createElement('div');
-    addNote.className = 'list-item-note add-note';
-    addNote.textContent = '+ Due date';
-    addNote.addEventListener('click', (e) => {
-      e.stopPropagation();
-      startEditingListNote(addNote, task);
-    });
-    content.appendChild(addNote);
-  }
+  content.appendChild(createCompactMetadata(task));
 
   if (task.notes && task.notes.length > 0) {
     const collapsible = isNotesPreviewCollapsible(task.notes);
@@ -2061,27 +2294,10 @@ function createListItem(task, section) {
     }
   }
 
-  if (initiatives.length > 0 || cardInitiatives(task).length > 0 || task.meetingRef) {
+  if (initiatives.length > 0 || cardInitiatives(task).length > 0) {
     const metaRow = document.createElement('div');
     metaRow.className = 'card-meta-row';
-    metaRow.style.marginTop = '6px';
-    if (initiatives.length > 0 || cardInitiatives(task).length > 0) {
-      metaRow.appendChild(createInitiativePills(task));
-    } else {
-      metaRow.appendChild(document.createElement('span'));
-    }
-    if (task.meetingRef) {
-      const meeting = findMeetingBySlug(task.meetingRef);
-      const badge = document.createElement('span');
-      badge.className = 'meeting-ref-badge';
-      badge.textContent = meeting ? meeting.title : task.meetingRef;
-      badge.title = meeting ? meeting.title : task.meetingRef;
-      badge.addEventListener('click', (e) => {
-        e.stopPropagation();
-        if (meeting) openCardExpanded(meeting);
-      });
-      metaRow.appendChild(badge);
-    }
+    metaRow.appendChild(createInitiativePills(task));
     content.appendChild(metaRow);
   }
 
@@ -2134,6 +2350,7 @@ function createNoteListItem(item) {
   title.textContent = item.title;
   title.addEventListener('click', (e) => { e.stopPropagation(); startEditingNoteTitle(title, item); });
   content.appendChild(title);
+  content.appendChild(createCompactMetadata(item));
 
   // Notes area — click anywhere to open textarea
   const notesArea = document.createElement('div');
@@ -2184,7 +2401,7 @@ function createNoteListItem(item) {
 
   if (initiatives.length > 0 || cardInitiatives(item).length > 0) {
     const pillRow = document.createElement('div');
-    pillRow.style.cssText = 'display: flex; justify-content: flex-start; margin-top: 6px;';
+    pillRow.className = 'card-meta-row';
     pillRow.appendChild(createInitiativePills(item));
     content.appendChild(pillRow);
   }
@@ -2200,33 +2417,6 @@ function createNoteListItem(item) {
   el.appendChild(content);
   el.appendChild(actions);
   return el;
-}
-
-function startEditingListNote(noteEl, task) {
-  const input = document.createElement('input');
-  input.type = 'date';
-  input.value = task.note || '';
-  input.style.cssText = 'background: var(--bg-card); border: 2px solid var(--accent); border-radius: 6px; padding: 4px 8px; color: var(--text-primary); font-size: 13px; font-family: inherit; outline: none;';
-
-  noteEl.replaceWith(input);
-  input.focus();
-  input.showPicker?.();
-
-  let saved = false;
-  const saveEdit = () => {
-    if (saved) return;
-    saved = true;
-    markdownCore.setCardDueDate(task, input.value);
-    markChanged();
-    renderTasks();
-  };
-
-  input.addEventListener('change', saveEdit);
-  input.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') { e.preventDefault(); saveEdit(); }
-    else if (e.key === 'Escape') { saved = true; renderTasks(); }
-  });
-  input.addEventListener('blur', saveEdit);
 }
 
 function startEditingListItem(titleEl, task) {

@@ -334,13 +334,13 @@ button:disabled {
 .task-card:hover {
   box-shadow: 0 14px 34px var(--shadow-hover);
   border-color: color-mix(in srgb, var(--accent) 34%, var(--border));
-  padding-top: 34px;
 }
 
 .card-heading-row {
   display: flex;
   align-items: flex-start;
   gap: 12px;
+  padding-right: 52px;
 }
 
 .task-card .delete-btn {
@@ -840,24 +840,73 @@ button:disabled {
   gap: 8px;
 }
 
-.meeting-ref-badge {
-  font-size: 11px;
-  color: var(--text-muted);
-  background: var(--bg-secondary);
-  padding: 2px 8px;
-  border-radius: 10px;
-  cursor: pointer;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 160px;
-  transition: all 0.15s ease;
-  border: 1px solid var(--border-light);
+.card-primary-meta {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 22px;
+  margin: 6px 0 0;
+  min-width: 0;
 }
 
-.meeting-ref-badge:hover {
+.task-card:not(.note-card) .card-primary-meta { margin-left: 30px; }
+
+.card-due-control {
+  padding: 0;
+  color: var(--text-muted);
+  background: transparent;
+  border: none;
+  font-size: 11px;
+  font-family: inherit;
+  line-height: 1.4;
+  cursor: pointer;
+}
+
+.card-due-control:hover,
+.card-due-control:focus-visible { color: var(--accent); outline: none; }
+
+.card-due-control.empty {
+  padding: 3px 8px;
+  color: var(--text-muted);
+  background: transparent;
+  border: 1px dashed var(--border);
+  border-radius: 999px;
+  font-style: italic;
+}
+
+.card-due-control.empty:hover,
+.card-due-control.empty:focus-visible {
   color: var(--accent);
   border-color: var(--accent);
+}
+
+.card-primary-meta-divider {
+  width: 1px;
+  height: 12px;
+  flex: 0 0 auto;
+  background: var(--border);
+}
+
+.meeting-ref-badge {
+  padding: 3px 8px;
+  overflow: hidden;
+  color: var(--text-muted);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-light);
+  border-radius: 6px;
+  max-width: 160px;
+  font-size: 11px;
+  font-family: inherit;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+.meeting-ref-badge:hover,
+.meeting-ref-badge:focus-visible {
+  color: var(--accent);
+  border-color: var(--accent);
+  outline: none;
 }
 
 .linked-tasks-section {
@@ -1131,7 +1180,6 @@ button:disabled {
 .list-item:hover {
   box-shadow: 0 14px 34px var(--shadow-hover);
   border-color: color-mix(in srgb, var(--accent) 34%, var(--border));
-  padding-top: 32px;
 }
 
 .list-item.dragging {
@@ -1147,6 +1195,7 @@ button:disabled {
 .list-item-content {
   flex: 1;
   min-width: 0;
+  padding-right: 52px;
 }
 
 .list-item-title {
@@ -1519,6 +1568,212 @@ button:disabled {
   flex-shrink: 0;
 }
 
+.card-expand-properties {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  border-bottom: 1px solid var(--border-light);
+  flex-shrink: 0;
+}
+
+.card-expand-property {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 0;
+  padding: 11px 28px 12px 24px;
+  color: var(--text-primary);
+  background: transparent;
+  border: none;
+  border-right: 1px solid var(--border-light);
+  border-radius: 0;
+  text-align: left;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.card-expand-property:last-child { border-right: none; }
+
+.card-expand-property:hover,
+.card-expand-property:focus-visible {
+  background: var(--bg-secondary);
+  outline: none;
+}
+
+.card-expand-property::after {
+  content: '⌄';
+  position: absolute;
+  top: 18px;
+  right: 12px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.card-expand-property-content {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-width: 0;
+}
+
+.card-expand-property-label {
+  margin-bottom: 3px;
+  color: var(--text-muted);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.card-expand-property-value {
+  max-width: 100%;
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.card-expand-property-value.empty {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.card-metadata-popover {
+  position: fixed;
+  z-index: 700;
+  padding: 12px;
+  color: var(--text-primary);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  box-shadow: 0 16px 38px rgba(20, 20, 19, 0.2);
+}
+
+.card-metadata-popover-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 9px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.card-metadata-escape {
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 500;
+}
+
+.card-metadata-date-input,
+.card-metadata-search-input {
+  width: 100%;
+  padding: 8px 9px;
+  color: var(--text-primary);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  outline: none;
+  font-family: inherit;
+}
+
+.card-metadata-date-input:focus,
+.card-metadata-search-input:focus { border-color: var(--accent); }
+
+.card-metadata-quick-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 8px;
+}
+
+.card-metadata-quick-actions button,
+.card-metadata-popover-footer button {
+  padding: 5px 8px;
+  color: var(--text-secondary);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-light);
+  border-radius: 6px;
+  font-size: 11px;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.card-metadata-quick-actions button:hover,
+.card-metadata-quick-actions button:focus-visible,
+.card-metadata-popover-footer button:hover,
+.card-metadata-popover-footer button:focus-visible {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+  outline: none;
+}
+
+.card-metadata-popover-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-top: 10px;
+  padding-top: 9px;
+  border-top: 1px solid var(--border-light);
+}
+
+.card-metadata-popover-footer .card-metadata-clear {
+  margin-right: auto;
+  color: #b9432f;
+  background: transparent;
+  border-color: transparent;
+}
+
+.card-metadata-popover-footer .card-metadata-done {
+  color: var(--bg-card);
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.card-metadata-popover-footer .card-metadata-done:hover,
+.card-metadata-popover-footer .card-metadata-done:focus-visible {
+  color: var(--bg-card);
+  filter: brightness(0.94);
+}
+
+.card-metadata-results {
+  max-height: 220px;
+  margin-top: 7px;
+  overflow-y: auto;
+}
+
+.card-metadata-result {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 8px;
+  color: var(--text-primary);
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  text-align: left;
+  font-family: inherit;
+}
+
+.card-metadata-result:hover,
+.card-metadata-result.highlighted { background: var(--bg-secondary); }
+
+.card-metadata-result small {
+  margin-left: auto;
+  padding: 2px 5px;
+  color: var(--text-muted);
+  background: var(--bg-secondary);
+  border-radius: 4px;
+  font-size: 10px;
+}
+
+.card-metadata-empty {
+  padding: 10px 8px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
 .card-expand-title-area {
   flex: 1;
   display: flex;
@@ -1593,27 +1848,6 @@ button:disabled {
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0;
-}
-
-.card-expand-due-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.card-expand-date-input {
-  background: var(--bg-secondary);
-  border: 1px solid var(--border);
-  border-radius: 7px;
-  padding: 6px 10px;
-  color: var(--text-primary);
-  font-size: 13px;
-  font-family: inherit;
-  outline: none;
-}
-
-.card-expand-date-input:focus {
-  border-color: var(--accent);
 }
 
 .card-expand-footer {
@@ -1931,5 +2165,24 @@ button:disabled {
     min-width: min(320px, calc(100vw - 32px));
     max-width: min(320px, calc(100vw - 32px));
   }
+
+  .card-expand-panel {
+    width: calc(100% - 20px);
+    height: calc(100vh - 20px);
+    max-height: calc(100vh - 20px);
+  }
+
+  .card-expand-header { padding: 16px; }
+
+  .card-expand-properties {
+    grid-template-columns: 1fr;
+  }
+
+  .card-expand-property {
+    border-right: none;
+    border-bottom: 1px solid var(--border-light);
+  }
+
+  .card-expand-property:last-child { border-bottom: none; }
 
 }

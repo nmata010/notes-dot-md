@@ -28,6 +28,7 @@ import {
   setCardDueDate,
   setCardInitiatives,
   setCardNotes,
+  setCardParent,
   setCardTitle,
   setWorkspaceCardTitle,
   toggleCardChecked,
@@ -135,6 +136,10 @@ assert.equal(setCardTitle(linkedTask, "   "), false);
 assert.equal(linkedTask.title, "Follow up again");
 assert.equal(setCardDueDate(linkedTask, "2026-06-15"), true);
 assert.equal(linkedTask.note, "2026-06-15");
+assert.equal(setCardParent(linkedTask, "Planning review"), true);
+assert.equal(linkedTask.meetingRef, "planning-review");
+assert.equal(setCardParent(linkedTask, ""), true);
+assert.equal(linkedTask.meetingRef, null);
 assert.equal(setCardInitiatives(linkedTask, ["client", "ops", "client"]), true);
 assert.deepEqual(linkedTask.initiatives, ["client", "ops"]);
 assert.equal(toggleCardInitiative(linkedTask, "client"), true);

@@ -229,6 +229,11 @@ export function setCardDueDate(card, dueDate) {
   return true;
 }
 
+export function setCardParent(card, parentTitle) {
+  card.meetingRef = parentTitle ? meetingSlug(parentTitle) : null;
+  return true;
+}
+
 export function setCardNotes(card, notes) {
   card.notes = notes;
   return true;
