@@ -751,18 +751,6 @@ button:disabled {
   flex-wrap: wrap;
   gap: 4px;
   margin-top: 8px;
-  max-height: 0;
-  overflow: hidden;
-  transition: max-height 0.2s ease, margin-top 0.2s ease;
-}
-
-.filter-pills.expanded {
-  max-height: 200px;
-  margin-top: 8px;
-}
-
-.filter-pills:not(.expanded) {
-  margin-top: 0;
 }
 
 .filter-pill {

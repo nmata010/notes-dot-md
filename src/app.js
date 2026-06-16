@@ -65,13 +65,6 @@ filterSearchInput.addEventListener('input', () => {
 
 filterSearchInput.addEventListener('focus', () => {
   renderFilterPills();
-  filterPills.classList.add('expanded');
-});
-
-document.addEventListener('click', (e) => {
-  if (!filterBar.contains(e.target) && !globalInitFilter) {
-    filterPills.classList.remove('expanded');
-  }
 });
 
 function renderFilterPills() {
@@ -172,6 +165,7 @@ async function loadTaskFileFromHandle(handle) {
   taskFileName = file.name;
   filePathEl.textContent = file.name;
   filterBar.style.display = 'flex';
+  renderFilterPills();
   setupBtn.style.display = 'inline-flex';
   saveBtn.disabled = true;
   showStatus('Loaded ' + file.name);
@@ -190,6 +184,7 @@ async function loadTaskFileFromText(fileName, content) {
   taskFileName = fileName;
   filePathEl.textContent = fileName + ' (download saves)';
   filterBar.style.display = 'flex';
+  renderFilterPills();
   setupBtn.style.display = 'inline-flex';
   saveBtn.disabled = false;
   showStatus('Loaded ' + fileName);
@@ -1993,6 +1988,7 @@ function stopWatching() {
 }
 
 function renderTasks() {
+  renderFilterPills();
   if (currentView === 'board') { renderBoard(); }
   else { renderList(); }
 }
